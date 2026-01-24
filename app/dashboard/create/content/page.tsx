@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -8,9 +8,11 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Plus, X, GripVertical, Check } from 'lucide-react'
+import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
+import type { SlideFormData, BriefFormData } from '@/lib/supabase/types'
+import VerticalVideoContent from '@/components/create/vertical-video-content'
 
 interface Author {
   id: string
@@ -21,46 +23,36 @@ interface Author {
   created_at: string | null
 }
 
-// Types matching database schema structure
-interface Slide {
-  id: string
-  slideIndex: number
-  slide_headline_1?: string
-  slide_content_1?: string
-  slide_headline_2?: string
-  slide_content_2?: string
-  slide_quote?: string
-  slide_quote_source?: string
-  portrait_video: boolean
-  mediaFiles: File[]
-}
-
-interface StoryFormData {
-  story_headline: string
-  headlinePhoto: File | null
-  author_id: string | null
-  author_name: string
-  slides: Slide[]
+// Global storage for File objects (can't be serialized to sessionStorage)
+declare global {
+  interface Window {
+    __briefMediaFiles?: {
+      headlinePhoto: File | null
+      slideMedia: Map<string, File[]>
+    }
+  }
 }
 
 export default function CreateContentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const format = searchParams.get('format')
+  const isVerticalVideo = format === 'vertical-video'
 
+  // All hooks must be called unconditionally at the top
   const [user, setUser] = useState<any>(null)
   const [author, setAuthor] = useState<Author | null>(null)
   const [loading, setLoading] = useState(true)
-  
+
   // Story form data - structured for backend integration
-  const [storyData, setStoryData] = useState<StoryFormData>({
-    story_headline: 'What Trump\'s troop deployment actually changed.',
+  const [storyData, setStoryData] = useState<BriefFormData>({
+    story_headline: '',
     headlinePhoto: null,
     author_id: null,
-    author_name: 'Nadya Yeh',
+    author_name: '',
     slides: [
       {
-        id: '1',
+        id: crypto.randomUUID(),
         slideIndex: 1,
         slide_headline_1: '',
         slide_content_1: '',
@@ -68,7 +60,7 @@ export default function CreateContentPage() {
         mediaFiles: [],
       },
       {
-        id: '2',
+        id: crypto.randomUUID(),
         slideIndex: 2,
         slide_headline_1: '',
         slide_content_1: '',
@@ -78,9 +70,44 @@ export default function CreateContentPage() {
     ],
   })
 
+  // Track object URLs for cleanup
+  const [headlinePhotoPreview, setHeadlinePhotoPreview] = useState<string | null>(null)
+  const [slideMediaPreviews, setSlideMediaPreviews] = useState<Map<string, string[]>>(new Map())
+
   useEffect(() => {
     checkUser()
+    // Initialize global file storage
+    if (!window.__briefMediaFiles) {
+      window.__briefMediaFiles = {
+        headlinePhoto: null,
+        slideMedia: new Map(),
+      }
+    }
+    // Cleanup object URLs on unmount
+    return () => {
+      if (headlinePhotoPreview) {
+        URL.revokeObjectURL(headlinePhotoPreview)
+      }
+      slideMediaPreviews.forEach(urls => {
+        urls.forEach(url => URL.revokeObjectURL(url))
+      })
+    }
   }, [])
+
+  // Update headline photo preview when file changes
+  useEffect(() => {
+    if (storyData.headlinePhoto) {
+      const url = URL.createObjectURL(storyData.headlinePhoto)
+      setHeadlinePhotoPreview(url)
+      // Store in global
+      if (window.__briefMediaFiles) {
+        window.__briefMediaFiles.headlinePhoto = storyData.headlinePhoto
+      }
+      return () => URL.revokeObjectURL(url)
+    } else {
+      setHeadlinePhotoPreview(null)
+    }
+  }, [storyData.headlinePhoto])
 
   const checkUser = async () => {
     try {
@@ -125,8 +152,8 @@ export default function CreateContentPage() {
   }
 
   const handleAddSlide = () => {
-    const newSlide: Slide = {
-      id: Date.now().toString(),
+    const newSlide: SlideFormData = {
+      id: crypto.randomUUID(),
       slideIndex: storyData.slides.length + 1,
       slide_headline_1: '',
       slide_content_1: '',
@@ -152,25 +179,81 @@ export default function CreateContentPage() {
     }))
   }
 
-  const handleSlideChange = (slideId: string, field: keyof Slide, value: string | boolean | File[]) => {
+  const handleSlideChange = (slideId: string, field: keyof SlideFormData, value: string | boolean | File[]) => {
     setStoryData(prev => ({
       ...prev,
-      slides: prev.slides.map(slide => 
+      slides: prev.slides.map(slide =>
         slide.id === slideId ? { ...slide, [field]: value } : slide
       ),
     }))
   }
 
   const handleSlideMediaChange = (slideId: string, files: FileList | null) => {
-    if (files) {
+    if (files && files.length > 0) {
       const fileArray = Array.from(files)
+
+      // Create preview URLs
+      const urls = fileArray.map(file => URL.createObjectURL(file))
+
+      // Revoke old URLs for this slide
+      const oldUrls = slideMediaPreviews.get(slideId)
+      if (oldUrls) {
+        oldUrls.forEach(url => URL.revokeObjectURL(url))
+      }
+
+      // Update preview map
+      setSlideMediaPreviews(prev => {
+        const newMap = new Map(prev)
+        newMap.set(slideId, urls)
+        return newMap
+      })
+
+      // Store in global for Response page
+      if (window.__briefMediaFiles) {
+        window.__briefMediaFiles.slideMedia.set(slideId, fileArray)
+      }
+
+      // Update form state
       handleSlideChange(slideId, 'mediaFiles', fileArray)
     }
   }
 
+  const isVideoFile = (file: File): boolean => {
+    return file.type.startsWith('video/')
+  }
+
   const handleContinue = () => {
+    // Save serializable state to sessionStorage
+    // Note: File objects can't be serialized, so they're stored in window.__briefMediaFiles
+    const serializableState = {
+      story_headline: storyData.story_headline,
+      headlinePhoto: null, // File stored in global
+      headlinePhotoName: storyData.headlinePhoto?.name || null,
+      author_id: storyData.author_id,
+      author_name: storyData.author_name,
+      slides: storyData.slides.map(slide => ({
+        id: slide.id,
+        slideIndex: slide.slideIndex,
+        slide_headline_1: slide.slide_headline_1,
+        slide_content_1: slide.slide_content_1,
+        slide_headline_2: slide.slide_headline_2,
+        slide_content_2: slide.slide_content_2,
+        slide_quote: slide.slide_quote,
+        slide_quote_source: slide.slide_quote_source,
+        portrait_video: slide.portrait_video,
+        mediaFiles: [], // Files stored in global
+        mediaFileNames: slide.mediaFiles.map(f => f.name),
+      })),
+    }
+    sessionStorage.setItem('briefDraftState', JSON.stringify(serializableState))
+
     // Navigate to next step (Response)
     router.push(`/dashboard/create/response?format=${format}`)
+  }
+
+  // Render Vertical Video content for that format
+  if (isVerticalVideo) {
+    return <VerticalVideoContent />
   }
 
   if (loading) {
@@ -181,6 +264,7 @@ export default function CreateContentPage() {
     )
   }
 
+  // Brief format (default)
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -254,49 +338,8 @@ export default function CreateContentPage() {
       </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8 max-w-7xl">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          {/* Left Pane: Mobile Preview - Narrower */}
-          <div className="lg:col-span-3 lg:sticky lg:top-8 lg:h-fit">
-            <Card className="p-6">
-              <h2 className="text-lg font-semibold text-card-foreground mb-4">
-                Mobile Preview
-              </h2>
-              <div className="bg-muted rounded-lg p-4 border border-border flex justify-center">
-                {/* iPhone Frame - iPhone 14/15 Pro dimensions (390x844) scaled to ~195px width */}
-                <div className="bg-card rounded-[3rem] p-[6px] shadow-lg" style={{ width: '195px', aspectRatio: '390/844' }}>
-                  {/* Screen */}
-                  <div className="bg-background rounded-[2.5rem] p-4 h-full overflow-hidden">
-                    {/* Preview Content */}
-                    <div className="space-y-4">
-                      {storyData.story_headline && (
-                        <div className="h-6 bg-muted rounded w-full" />
-                      )}
-                      {storyData.story_headline && (
-                        <div className="h-4 bg-muted rounded w-3/4" />
-                      )}
-                      {storyData.slides.slice(0, 2).map((slide) => (
-                        <div key={slide.id} className="space-y-2 pt-4">
-                          {slide.slide_headline_1 && (
-                            <div className="h-5 bg-muted rounded w-full" />
-                          )}
-                          {slide.slide_content_1 && (
-                            <>
-                              <div className="h-3 bg-muted rounded w-full" />
-                              <div className="h-3 bg-muted rounded w-5/6" />
-                            </>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Right Pane: Content Editing - Wider */}
-          <div className="lg:col-span-9 space-y-8">
+      <main className="container mx-auto px-4 py-8 max-w-4xl pb-24">
+        <div className="space-y-8">
             {/* Story Details */}
             <Card className="p-6">
               <h2 className="text-lg font-semibold text-card-foreground mb-6">
@@ -323,25 +366,50 @@ export default function CreateContentPage() {
                   <Label htmlFor="headline-photo" className="text-foreground">
                     Headline Photo<span className="text-primary ml-1">*</span>
                   </Label>
-                  <div className="flex items-center gap-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => document.getElementById('headline-photo-input')?.click()}
-                      className="bg-background"
-                    >
-                      Choose File
-                    </Button>
-                    <input
-                      id="headline-photo-input"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => setStoryData(prev => ({ ...prev, headlinePhoto: e.target.files?.[0] || null }))}
-                    />
-                    <span className="text-sm text-muted-foreground">
-                      {storyData.headlinePhoto ? storyData.headlinePhoto.name : 'No file chosen'}
-                    </span>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => document.getElementById('headline-photo-input')?.click()}
+                        className="bg-background"
+                      >
+                        Choose File
+                      </Button>
+                      <input
+                        id="headline-photo-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => setStoryData(prev => ({ ...prev, headlinePhoto: e.target.files?.[0] || null }))}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        {storyData.headlinePhoto ? storyData.headlinePhoto.name : 'No file chosen'}
+                      </span>
+                    </div>
+                    {/* Headline Photo Preview */}
+                    {headlinePhotoPreview && (
+                      <div className="relative w-full max-w-xs">
+                        <img
+                          src={headlinePhotoPreview}
+                          alt="Headline preview"
+                          className="w-full h-40 object-cover rounded-lg border border-border"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setStoryData(prev => ({ ...prev, headlinePhoto: null }))
+                            if (window.__briefMediaFiles) {
+                              window.__briefMediaFiles.headlinePhoto = null
+                            }
+                          }}
+                          className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
+                          aria-label="Remove image"
+                        >
+                          <X className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -396,7 +464,7 @@ export default function CreateContentPage() {
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-4">
                           <span className="text-sm font-medium text-card-foreground">
-                            T Slide {slide.slideIndex}
+                            Slide {slide.slideIndex}
                           </span>
                           <Button
                             type="button"
@@ -444,28 +512,94 @@ export default function CreateContentPage() {
                             <Label htmlFor={`image-${slide.id}`} className="text-foreground">
                               Image or Video <span className="text-muted-foreground font-normal">(optional)</span>
                             </Label>
-                            <div className="flex items-center gap-3">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => document.getElementById(`image-input-${slide.id}`)?.click()}
-                                className="bg-background"
-                              >
-                                Choose File
-                              </Button>
-                              <input
-                                id={`image-input-${slide.id}`}
-                                type="file"
-                                accept="image/*,video/*"
-                                multiple
-                                className="hidden"
-                                onChange={(e) => handleSlideMediaChange(slide.id, e.target.files)}
-                              />
-                              <span className="text-sm text-muted-foreground">
-                                {slide.mediaFiles.length > 0 
-                                  ? `${slide.mediaFiles.length} file${slide.mediaFiles.length > 1 ? 's' : ''} chosen`
-                                  : 'No file chosen'}
-                              </span>
+                            <div className="space-y-3">
+                              <div className="flex items-center gap-3">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => document.getElementById(`image-input-${slide.id}`)?.click()}
+                                  className="bg-background"
+                                >
+                                  Choose File
+                                </Button>
+                                <input
+                                  id={`image-input-${slide.id}`}
+                                  type="file"
+                                  accept="image/*,video/*"
+                                  className="hidden"
+                                  onChange={(e) => handleSlideMediaChange(slide.id, e.target.files)}
+                                />
+                                <span className="text-sm text-muted-foreground">
+                                  {slide.mediaFiles.length > 0
+                                    ? `${slide.mediaFiles.length} file${slide.mediaFiles.length > 1 ? 's' : ''} chosen`
+                                    : 'No file chosen'}
+                                </span>
+                              </div>
+                              {/* Slide Media Preview */}
+                              {slideMediaPreviews.get(slide.id)?.map((url, idx) => {
+                                const file = slide.mediaFiles[idx]
+                                const isVideo = file && isVideoFile(file)
+                                return (
+                                  <div key={idx} className="relative w-full max-w-xs">
+                                    {isVideo ? (
+                                      <div className="relative">
+                                        <video
+                                          src={url}
+                                          className="w-full h-40 object-cover rounded-lg border border-border"
+                                          controls={false}
+                                          muted
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
+                                          <Video className="h-8 w-8 text-white" />
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <img
+                                        src={url}
+                                        alt={`Slide ${slide.slideIndex} media ${idx + 1}`}
+                                        className="w-full h-40 object-cover rounded-lg border border-border"
+                                      />
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        // Remove this file
+                                        const newFiles = slide.mediaFiles.filter((_, i) => i !== idx)
+                                        handleSlideChange(slide.id, 'mediaFiles', newFiles)
+                                        // Update previews
+                                        const currentUrls = slideMediaPreviews.get(slide.id) || []
+                                        URL.revokeObjectURL(currentUrls[idx])
+                                        const newUrls = currentUrls.filter((_, i) => i !== idx)
+                                        setSlideMediaPreviews(prev => {
+                                          const newMap = new Map(prev)
+                                          if (newUrls.length > 0) {
+                                            newMap.set(slide.id, newUrls)
+                                          } else {
+                                            newMap.delete(slide.id)
+                                          }
+                                          return newMap
+                                        })
+                                        // Update global
+                                        if (window.__briefMediaFiles) {
+                                          if (newFiles.length > 0) {
+                                            window.__briefMediaFiles.slideMedia.set(slide.id, newFiles)
+                                          } else {
+                                            window.__briefMediaFiles.slideMedia.delete(slide.id)
+                                          }
+                                        }
+                                      }}
+                                      className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
+                                      aria-label="Remove media"
+                                    >
+                                      <X className="h-4 w-4 text-muted-foreground" />
+                                    </button>
+                                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-background/80 rounded text-xs text-muted-foreground flex items-center gap-1">
+                                      {isVideo ? <Video className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
+                                      {file?.name?.slice(0, 20)}{file?.name && file.name.length > 20 ? '...' : ''}
+                                    </div>
+                                  </div>
+                                )
+                              })}
                             </div>
                           </div>
                         </div>
@@ -475,7 +609,6 @@ export default function CreateContentPage() {
                 ))}
               </div>
             </Card>
-          </div>
         </div>
       </main>
 

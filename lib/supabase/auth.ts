@@ -51,19 +51,14 @@ export async function checkAuthorExists(email: string): Promise<{
 
 /**
  * Check if a user exists in Supabase Auth
+ * Note: Admin API getUserById requires user ID, not email.
+ * This function is best-effort - returns false if unable to check.
  */
-export async function checkUserExistsInAuth(email: string): Promise<boolean> {
-  try {
-    const { data, error } = await supabase.auth.admin.getUserByEmail(email)
-    // If we get data, user exists. If error, user doesn't exist
-    return !error && !!data?.user
-  } catch (error) {
-    // If admin API is not available, try alternative method
-    // We'll use signInWithOtp with shouldCreateUser: false to check
-    // But actually, we can't check without admin API, so we'll try to create
-    // and handle the error if user already exists
-    return false
-  }
+export async function checkUserExistsInAuth(_email: string): Promise<boolean> {
+  // The admin.getUserByEmail is not available in the current Supabase JS SDK.
+  // This function is primarily used as a fallback check.
+  // The main author validation happens via checkAuthorExists which queries the authors table.
+  return false
 }
 
 /**
