@@ -16,6 +16,10 @@ interface Author {
   author_last_name: string | null
   author_bio: string | null
   author_email: string | null
+  author_role: string | null
+  author_organization: string | null
+  author_avatar: string | null
+  is_first_login: boolean | null
   created_at: string | null
 }
 
@@ -73,6 +77,11 @@ export default function DashboardPage() {
           .maybeSingle()
 
         if (!error && authorData) {
+          // Redirect to onboarding if first login
+          if (authorData.is_first_login) {
+            router.push('/onboarding')
+            return
+          }
           setAuthor(authorData)
           // Fetch content for this author
           await fetchAuthorContent(authorData.id)
@@ -314,19 +323,29 @@ export default function DashboardPage() {
           {/* Author Profile Card */}
           <Card className="p-6">
             <div className="flex flex-col items-center text-center">
-              <div className={cn(
-                "w-16 h-16 rounded-full flex items-center justify-center mb-4",
-                "bg-primary text-primary-foreground"
-              )}>
-                <span className="text-xl font-bold">
-                  {getAuthorInitials()}
-                </span>
-              </div>
+              {author?.author_avatar ? (
+                <img
+                  src={author.author_avatar}
+                  alt={getAuthorName()}
+                  className="w-16 h-16 rounded-full object-cover mb-4"
+                />
+              ) : (
+                <div className={cn(
+                  "w-16 h-16 rounded-full flex items-center justify-center mb-4",
+                  "bg-primary text-primary-foreground"
+                )}>
+                  <span className="text-xl font-bold">
+                    {getAuthorInitials()}
+                  </span>
+                </div>
+              )}
               <h2 className="text-lg font-semibold text-card-foreground mb-1">
                 {getAuthorName()}
               </h2>
               <p className="text-sm text-muted-foreground mb-2">
-                Building @Newsreel
+                {author?.author_role && author?.author_organization
+                  ? `${author.author_role} at ${author.author_organization}`
+                  : author?.author_role || author?.author_organization || 'Author'}
               </p>
               <p className="text-xs text-muted-foreground mb-4">
                 {formatJoinDate(author?.created_at || null)}
@@ -334,7 +353,7 @@ export default function DashboardPage() {
               <Button
                 variant="outline"
                 className="w-full"
-                onClick={() => {/* Handle edit profile */}}
+                onClick={() => router.push('/onboarding?edit=true')}
               >
                 Edit Profile
               </Button>
