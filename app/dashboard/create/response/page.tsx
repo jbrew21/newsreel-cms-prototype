@@ -7,7 +7,7 @@ import { saveBriefPost } from '@/lib/supabase/brief'
 import { saveVerticalVideoPost } from '@/lib/supabase/video-feed'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ArrowLeft, Check, FileText, Loader2, CheckCircle2, Video } from 'lucide-react'
+import { ArrowLeft, Check, FileText, Loader2, CheckCircle2, Video, HelpCircle, BarChart3 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
 import type { BriefFormData, VerticalVideoFormData, SaveMode } from '@/lib/supabase/types'
@@ -501,6 +501,44 @@ export default function ResponsePage() {
                     ) : (
                       <span className="text-amber-600 dark:text-amber-400">
                         No cover photo selected
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quiz Status */}
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                    Quiz Slide
+                  </div>
+                  <div className="text-card-foreground">
+                    {draftState.quiz && draftState.quiz.quiz_content ? (
+                      <span className="text-green-600 dark:text-green-400 flex items-center gap-2">
+                        <HelpCircle className="h-4 w-4" />
+                        Quiz included
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        No quiz (optional)
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Poll Status */}
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                    Poll Slide
+                  </div>
+                  <div className="text-card-foreground">
+                    {draftState.poll && draftState.poll.question ? (
+                      <span className="text-green-600 dark:text-green-400 flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4" />
+                        Poll included
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        No poll (optional)
                       </span>
                     )}
                   </div>

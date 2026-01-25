@@ -135,6 +135,7 @@ export interface Poll {
 
 export interface Quiz {
   id: string
+  story_id: string
   quiz_content: string | null
   quiz_answer_a: string | null
   quiz_answer_b: string | null
@@ -220,6 +221,25 @@ export interface VideoFeedMediaInsert {
   sort_order?: number
 }
 
+export interface QuizInsert {
+  story_id: string
+  quiz_content?: string | null
+  quiz_answer_a?: string | null
+  quiz_answer_b?: string | null
+  quiz_answer_c?: string | null
+  quiz_answer_d?: string | null
+  published_at?: string | null
+}
+
+export interface PollInsert {
+  story_id: string
+  question?: string | null
+  econ_weight?: number | null
+  social_weight?: number | null
+  importance?: number | null
+  published_at?: string | null
+}
+
 // ============================================
 // Form/UI Types
 // ============================================
@@ -239,6 +259,21 @@ export interface SlideFormData {
   savedMediaUrls?: string[]
 }
 
+export interface QuizFormData {
+  quiz_content: string
+  quiz_answer_a: string
+  quiz_answer_b: string
+  quiz_answer_c: string
+  quiz_answer_d: string
+}
+
+export interface PollFormData {
+  question: string
+  econ_weight: number | null
+  social_weight: number | null
+  importance: number | null
+}
+
 export interface BriefFormData {
   story_headline: string
   headlinePhoto: File | null
@@ -246,6 +281,9 @@ export interface BriefFormData {
   author_id: string | null
   author_name: string
   slides: SlideFormData[]
+  // Optional quiz and poll
+  quiz?: QuizFormData | null
+  poll?: PollFormData | null
 }
 
 export interface VerticalVideoFormData {

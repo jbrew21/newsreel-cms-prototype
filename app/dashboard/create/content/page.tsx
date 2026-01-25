@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
-import type { SlideFormData, BriefFormData } from '@/lib/supabase/types'
+import type { SlideFormData, BriefFormData, QuizFormData, PollFormData } from '@/lib/supabase/types'
 import VerticalVideoContent from '@/components/create/vertical-video-content'
 
 interface Author {
@@ -68,6 +68,8 @@ export default function CreateContentPage() {
         mediaFiles: [],
       },
     ],
+    quiz: null,
+    poll: null,
   })
 
   // Track object URLs for cleanup
@@ -307,6 +309,9 @@ export default function CreateContentPage() {
         mediaFiles: [], // Files stored in global
         mediaFileNames: slide.mediaFiles.map(f => f.name),
       })),
+      // Include quiz and poll (optional, can be null)
+      quiz: storyData.quiz,
+      poll: storyData.poll,
     }
     sessionStorage.setItem('briefDraftState', JSON.stringify(serializableState))
 
@@ -683,6 +688,261 @@ export default function CreateContentPage() {
                   </Card>
                 ))}
               </div>
+            </Card>
+
+            {/* Quiz Slide (Optional) */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-card-foreground">
+                    Quiz Slide
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Optional - Add a quiz question with multiple choice answers
+                  </p>
+                </div>
+                {storyData.quiz && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setStoryData(prev => ({ ...prev, quiz: null }))}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+
+              {storyData.quiz ? (
+                <div className="space-y-4">
+                  {/* Quiz Content */}
+                  <div className="space-y-2">
+                    <Label htmlFor="quiz-content" className="text-foreground">
+                      Quiz Question
+                    </Label>
+                    <Textarea
+                      id="quiz-content"
+                      value={storyData.quiz.quiz_content}
+                      onChange={(e) => setStoryData(prev => ({
+                        ...prev,
+                        quiz: prev.quiz ? { ...prev.quiz, quiz_content: e.target.value } : null
+                      }))}
+                      placeholder="Enter your quiz question..."
+                      className="bg-background"
+                    />
+                  </div>
+
+                  {/* Answer Options */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="quiz-answer-a" className="text-foreground">
+                        Answer A
+                      </Label>
+                      <Input
+                        id="quiz-answer-a"
+                        value={storyData.quiz.quiz_answer_a}
+                        onChange={(e) => setStoryData(prev => ({
+                          ...prev,
+                          quiz: prev.quiz ? { ...prev.quiz, quiz_answer_a: e.target.value } : null
+                        }))}
+                        placeholder="Option A"
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quiz-answer-b" className="text-foreground">
+                        Answer B
+                      </Label>
+                      <Input
+                        id="quiz-answer-b"
+                        value={storyData.quiz.quiz_answer_b}
+                        onChange={(e) => setStoryData(prev => ({
+                          ...prev,
+                          quiz: prev.quiz ? { ...prev.quiz, quiz_answer_b: e.target.value } : null
+                        }))}
+                        placeholder="Option B"
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quiz-answer-c" className="text-foreground">
+                        Answer C
+                      </Label>
+                      <Input
+                        id="quiz-answer-c"
+                        value={storyData.quiz.quiz_answer_c}
+                        onChange={(e) => setStoryData(prev => ({
+                          ...prev,
+                          quiz: prev.quiz ? { ...prev.quiz, quiz_answer_c: e.target.value } : null
+                        }))}
+                        placeholder="Option C"
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="quiz-answer-d" className="text-foreground">
+                        Answer D
+                      </Label>
+                      <Input
+                        id="quiz-answer-d"
+                        value={storyData.quiz.quiz_answer_d}
+                        onChange={(e) => setStoryData(prev => ({
+                          ...prev,
+                          quiz: prev.quiz ? { ...prev.quiz, quiz_answer_d: e.target.value } : null
+                        }))}
+                        placeholder="Option D"
+                        className="bg-background"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => setStoryData(prev => ({
+                    ...prev,
+                    quiz: {
+                      quiz_content: '',
+                      quiz_answer_a: '',
+                      quiz_answer_b: '',
+                      quiz_answer_c: '',
+                      quiz_answer_d: '',
+                    }
+                  }))}
+                  className="w-full border-dashed"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Quiz Slide
+                </Button>
+              )}
+            </Card>
+
+            {/* Poll Slide (Optional) */}
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-lg font-semibold text-card-foreground">
+                    Poll Slide
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Optional - Add a poll question with weight parameters
+                  </p>
+                </div>
+                {storyData.poll && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setStoryData(prev => ({ ...prev, poll: null }))}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <X className="h-4 w-4 mr-1" />
+                    Remove
+                  </Button>
+                )}
+              </div>
+
+              {storyData.poll ? (
+                <div className="space-y-4">
+                  {/* Poll Question */}
+                  <div className="space-y-2">
+                    <Label htmlFor="poll-question" className="text-foreground">
+                      Poll Question
+                    </Label>
+                    <Textarea
+                      id="poll-question"
+                      value={storyData.poll.question}
+                      onChange={(e) => setStoryData(prev => ({
+                        ...prev,
+                        poll: prev.poll ? { ...prev.poll, question: e.target.value } : null
+                      }))}
+                      placeholder="Enter your poll question..."
+                      className="bg-background"
+                    />
+                  </div>
+
+                  {/* Weight Parameters */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="econ-weight" className="text-foreground">
+                        Economic Weight
+                      </Label>
+                      <Input
+                        id="econ-weight"
+                        type="number"
+                        step="0.01"
+                        value={storyData.poll.econ_weight ?? ''}
+                        onChange={(e) => setStoryData(prev => ({
+                          ...prev,
+                          poll: prev.poll ? {
+                            ...prev.poll,
+                            econ_weight: e.target.value ? parseFloat(e.target.value) : null
+                          } : null
+                        }))}
+                        placeholder="0.00"
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="social-weight" className="text-foreground">
+                        Social Weight
+                      </Label>
+                      <Input
+                        id="social-weight"
+                        type="number"
+                        step="0.01"
+                        value={storyData.poll.social_weight ?? ''}
+                        onChange={(e) => setStoryData(prev => ({
+                          ...prev,
+                          poll: prev.poll ? {
+                            ...prev.poll,
+                            social_weight: e.target.value ? parseFloat(e.target.value) : null
+                          } : null
+                        }))}
+                        placeholder="0.00"
+                        className="bg-background"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="importance" className="text-foreground">
+                        Importance
+                      </Label>
+                      <Input
+                        id="importance"
+                        type="number"
+                        step="0.01"
+                        value={storyData.poll.importance ?? ''}
+                        onChange={(e) => setStoryData(prev => ({
+                          ...prev,
+                          poll: prev.poll ? {
+                            ...prev.poll,
+                            importance: e.target.value ? parseFloat(e.target.value) : null
+                          } : null
+                        }))}
+                        placeholder="0.00"
+                        className="bg-background"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  onClick={() => setStoryData(prev => ({
+                    ...prev,
+                    poll: {
+                      question: '',
+                      econ_weight: null,
+                      social_weight: null,
+                      importance: null,
+                    }
+                  }))}
+                  className="w-full border-dashed"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Poll Slide
+                </Button>
+              )}
             </Card>
         </div>
       </main>

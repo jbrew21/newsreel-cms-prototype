@@ -14,6 +14,8 @@ import type {
   SaveBriefResult,
   StoryInsert,
   SlideInsert,
+  QuizInsert,
+  PollInsert,
 } from './types'
 
 // ============================================
@@ -173,7 +175,54 @@ export async function saveBriefPost(params: {
     }
 
     // ========================================
-    // Step 6: Link Author to Story
+    // Step 6: Create Quiz (Optional)
+    // ========================================
+    if (draftState.quiz && draftState.quiz.quiz_content) {
+      const quizInsert: QuizInsert = {
+        story_id: storyId,
+        quiz_content: draftState.quiz.quiz_content || null,
+        quiz_answer_a: draftState.quiz.quiz_answer_a || null,
+        quiz_answer_b: draftState.quiz.quiz_answer_b || null,
+        quiz_answer_c: draftState.quiz.quiz_answer_c || null,
+        quiz_answer_d: draftState.quiz.quiz_answer_d || null,
+        published_at: publishedAt,
+      }
+
+      const { error: quizError } = await supabase
+        .from('quizzes')
+        .insert(quizInsert)
+
+      if (quizError) {
+        console.error('Failed to create quiz:', quizError)
+        // Non-fatal: story is still created
+      }
+    }
+
+    // ========================================
+    // Step 7: Create Poll (Optional)
+    // ========================================
+    if (draftState.poll && draftState.poll.question) {
+      const pollInsert: PollInsert = {
+        story_id: storyId,
+        question: draftState.poll.question || null,
+        econ_weight: draftState.poll.econ_weight,
+        social_weight: draftState.poll.social_weight,
+        importance: draftState.poll.importance,
+        published_at: publishedAt,
+      }
+
+      const { error: pollError } = await supabase
+        .from('polls')
+        .insert(pollInsert)
+
+      if (pollError) {
+        console.error('Failed to create poll:', pollError)
+        // Non-fatal: story is still created
+      }
+    }
+
+    // ========================================
+    // Step 8: Link Author to Story
     // ========================================
     if (draftState.author_id) {
       const { error: authorLinkError } = await supabase
