@@ -74,6 +74,10 @@ export default function CreateContentPage() {
   const [headlinePhotoPreview, setHeadlinePhotoPreview] = useState<string | null>(null)
   const [slideMediaPreviews, setSlideMediaPreviews] = useState<Map<string, string[]>>(new Map())
 
+  // Drag and drop state
+  const [draggedSlideId, setDraggedSlideId] = useState<string | null>(null)
+  const [dragOverSlideId, setDragOverSlideId] = useState<string | null>(null)
+
   useEffect(() => {
     checkUser()
     // Initialize global file storage
@@ -220,6 +224,65 @@ export default function CreateContentPage() {
 
   const isVideoFile = (file: File): boolean => {
     return file.type.startsWith('video/')
+  }
+
+  // Drag and drop handlers
+  const handleDragStart = (e: React.DragEvent, slideId: string) => {
+    setDraggedSlideId(slideId)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', slideId)
+  }
+
+  const handleDragOver = (e: React.DragEvent, slideId: string) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (draggedSlideId !== slideId) {
+      setDragOverSlideId(slideId)
+    }
+  }
+
+  const handleDragLeave = () => {
+    setDragOverSlideId(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedSlideId(null)
+    setDragOverSlideId(null)
+  }
+
+  const handleDrop = (e: React.DragEvent, targetSlideId: string) => {
+    e.preventDefault()
+
+    if (!draggedSlideId || draggedSlideId === targetSlideId) {
+      setDraggedSlideId(null)
+      setDragOverSlideId(null)
+      return
+    }
+
+    // Find indices
+    const draggedIndex = storyData.slides.findIndex(s => s.id === draggedSlideId)
+    const targetIndex = storyData.slides.findIndex(s => s.id === targetSlideId)
+
+    if (draggedIndex === -1 || targetIndex === -1) return
+
+    // Reorder slides
+    const newSlides = [...storyData.slides]
+    const [removed] = newSlides.splice(draggedIndex, 1)
+    newSlides.splice(targetIndex, 0, removed)
+
+    // Reindex slides
+    const reindexed = newSlides.map((slide, index) => ({
+      ...slide,
+      slideIndex: index + 1,
+    }))
+
+    setStoryData(prev => ({
+      ...prev,
+      slides: reindexed,
+    }))
+
+    setDraggedSlideId(null)
+    setDragOverSlideId(null)
   }
 
   const handleContinue = () => {
@@ -452,15 +515,27 @@ export default function CreateContentPage() {
 
               <div className="space-y-4">
                 {storyData.slides.map((slide) => (
-                  <Card key={slide.id} className="p-4 border-2">
+                  <Card
+                    key={slide.id}
+                    className={cn(
+                      "p-4 border-2 transition-all",
+                      draggedSlideId === slide.id && "opacity-50 scale-[0.98]",
+                      dragOverSlideId === slide.id && "border-primary border-dashed"
+                    )}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, slide.id)}
+                    onDragOver={(e) => handleDragOver(e, slide.id)}
+                    onDragLeave={handleDragLeave}
+                    onDragEnd={handleDragEnd}
+                    onDrop={(e) => handleDrop(e, slide.id)}
+                  >
                     <div className="flex items-start gap-3 mb-4">
-                      <button
-                        type="button"
-                        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors"
+                      <div
+                        className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground transition-colors pt-1"
                         aria-label="Drag to reorder"
                       >
                         <GripVertical className="h-5 w-5" />
-                      </button>
+                      </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between mb-4">
                           <span className="text-sm font-medium text-card-foreground">
