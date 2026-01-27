@@ -587,6 +587,20 @@ export default function CreateContentPage() {
                             />
                           </div>
 
+                          {/* Media Source */}
+                          <div className="space-y-2">
+                            <Label htmlFor={`media-source-${slide.id}`} className="text-foreground">
+                              Media Source <span className="text-muted-foreground font-normal">(optional)</span>
+                            </Label>
+                            <Input
+                              id={`media-source-${slide.id}`}
+                              value={slide.slide_media_source || ''}
+                              onChange={(e) => handleSlideChange(slide.id, 'slide_media_source', e.target.value)}
+                              placeholder="e.g., Reuters, AP, Getty Images"
+                              className="bg-background"
+                            />
+                          </div>
+
                           {/* Image or Video (optional) */}
                           <div className="space-y-2">
                             <Label htmlFor={`image-${slide.id}`} className="text-foreground">
