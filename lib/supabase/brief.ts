@@ -123,7 +123,7 @@ export async function saveBriefPost(params: {
         slide_headline_2: slide.slide_headline_2 || null,
         slide_content_2: slide.slide_content_2 || null,
         slide_quote: slide.slide_quote || null,
-        slide_quote_source: slide.slide_quote_source || null,
+        slide_media_source: slide.slide_media_source || null,
         portrait_video: slide.portrait_video,
         published_at: publishedAt,
       }

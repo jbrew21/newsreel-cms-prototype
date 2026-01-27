@@ -304,7 +304,7 @@ export default function CreateContentPage() {
         slide_headline_2: slide.slide_headline_2,
         slide_content_2: slide.slide_content_2,
         slide_quote: slide.slide_quote,
-        slide_quote_source: slide.slide_quote_source,
+        slide_media_source: slide.slide_media_source,
         portrait_video: slide.portrait_video,
         mediaFiles: [], // Files stored in global
         mediaFileNames: slide.mediaFiles.map(f => f.name),

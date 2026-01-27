@@ -57,7 +57,7 @@ export interface Slide {
   slide_content_2: string | null
   portrait_video: boolean
   slide_quote: string | null
-  slide_quote_source: string | null
+  slide_media_source: string | null
   created_at: string | null
   updated_at: string | null
   published_at: string | null
@@ -174,7 +174,7 @@ export interface SlideInsert {
   slide_content_2?: string | null
   portrait_video?: boolean
   slide_quote?: string | null
-  slide_quote_source?: string | null
+  slide_media_source?: string | null
   published_at?: string | null
 }
 
@@ -252,7 +252,7 @@ export interface SlideFormData {
   slide_headline_2?: string
   slide_content_2?: string
   slide_quote?: string
-  slide_quote_source?: string
+  slide_media_source?: string
   portrait_video: boolean
   mediaFiles: File[]
   // After save, we store the public URLs
