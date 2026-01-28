@@ -15,9 +15,7 @@ export default function LoginPage() {
         <div className="bg-card border border-border rounded-lg p-8 shadow-xl">
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <div className="w-16 h-16 bg-black dark:bg-black rounded-xl flex items-center justify-center p-3">
-              <Logo width={48} height={48} />
-            </div>
+            <Logo width={96} height={96} />
           </div>
 
           {/* Header */}

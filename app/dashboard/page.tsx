@@ -280,8 +280,7 @@ export default function DashboardPage() {
       <header className="border-b border-border bg-card">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Logo width={32} height={32} />
-            <h1 className="text-xl font-bold text-foreground">Newsreel</h1>
+            <Logo width={64} height={64} />
           </div>
           <div className="flex items-center gap-2">
             <Button
