@@ -329,3 +329,15 @@ export interface SaveVerticalVideoResult {
   success: boolean
   error?: string
 }
+
+// ============================================
+// Edit/Update Types
+// ============================================
+
+export interface EditBriefMetadata {
+  storyId: string
+  existingCoverUrl: string | null
+  existingSlideIds: string[]
+  existingQuizId: string | null
+  existingPollId: string | null
+}

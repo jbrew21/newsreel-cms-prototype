@@ -660,6 +660,16 @@ export default function DashboardPage() {
               <Button variant="outline" onClick={() => setSelectedContent(null)}>
                 Close
               </Button>
+              {selectedContent.type === 'story' && (
+                <Button
+                  onClick={() => {
+                    setSelectedContent(null)
+                    router.push(`/dashboard/create/content?format=brief&storyId=${selectedContent.data.id}`)
+                  }}
+                >
+                  Edit Story
+                </Button>
+              )}
             </div>
           </Card>
         </div>

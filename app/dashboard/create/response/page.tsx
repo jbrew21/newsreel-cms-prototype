@@ -3,14 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
-import { saveBriefPost } from '@/lib/supabase/brief'
+import { saveBriefPost, updateBriefPost } from '@/lib/supabase/brief'
 import { saveVerticalVideoPost } from '@/lib/supabase/video-feed'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { ArrowLeft, Check, FileText, Loader2, CheckCircle2, Video, HelpCircle, BarChart3 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
-import type { BriefFormData, VerticalVideoFormData, SaveMode } from '@/lib/supabase/types'
+import type { BriefFormData, VerticalVideoFormData, SaveMode, EditBriefMetadata } from '@/lib/supabase/types'
 
 interface Author {
   id: string
@@ -25,13 +25,16 @@ export default function ResponsePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const format = searchParams.get('format')
+  const storyId = searchParams.get('storyId')
   const isVerticalVideo = format === 'vertical-video'
+  const isEditMode = !!storyId
 
   const [user, setUser] = useState<any>(null)
   const [author, setAuthor] = useState<Author | null>(null)
   const [loading, setLoading] = useState(true)
   const [draftState, setDraftState] = useState<BriefFormData | null>(null)
   const [videoDraftState, setVideoDraftState] = useState<VerticalVideoFormData | null>(null)
+  const [editMetadata, setEditMetadata] = useState<EditBriefMetadata | null>(null)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [savedStoryId, setSavedStoryId] = useState<string | null>(null)
   const [savedVideoUrl, setSavedVideoUrl] = useState<string | null>(null)
@@ -83,6 +86,11 @@ export default function ResponsePage() {
         if (stored) {
           const parsed = JSON.parse(stored)
           setDraftState(parsed)
+        }
+        // Load edit metadata if in edit mode
+        const storedMeta = sessionStorage.getItem('briefEditMetadata')
+        if (storedMeta) {
+          setEditMetadata(JSON.parse(storedMeta))
         }
       }
     } catch (error) {
@@ -160,31 +168,45 @@ export default function ResponsePage() {
         slideMedia: Map<string, File[]>
       } | undefined
 
-      if (!storedFiles) {
-        setErrorMessage('Media files not found. Please go back and re-upload your files.')
-        setSaveStatus('idle')
-        return
-      }
-
+      // For edit mode, storedFiles might not exist if no new files were added
       const fullDraftState: BriefFormData = {
         ...draftState,
-        headlinePhoto: storedFiles.headlinePhoto,
+        headlinePhoto: storedFiles?.headlinePhoto || null,
         slides: draftState.slides.map(slide => ({
           ...slide,
-          mediaFiles: storedFiles.slideMedia.get(slide.id) || [],
+          mediaFiles: storedFiles?.slideMedia?.get(slide.id) || [],
         })),
       }
 
-      const result = await saveBriefPost({
-        mode,
-        draftState: fullDraftState,
-        userId: user.id,
-      })
+      let result
+
+      if (isEditMode && editMetadata) {
+        // Update existing story
+        result = await updateBriefPost({
+          mode,
+          draftState: fullDraftState,
+          userId: user.id,
+          editMetadata,
+        })
+      } else {
+        // Create new story
+        if (!storedFiles) {
+          setErrorMessage('Media files not found. Please go back and re-upload your files.')
+          setSaveStatus('idle')
+          return
+        }
+        result = await saveBriefPost({
+          mode,
+          draftState: fullDraftState,
+          userId: user.id,
+        })
+      }
 
       if (result.success) {
         setSaveStatus('success')
         setSavedStoryId(result.storyId)
         sessionStorage.removeItem('briefDraftState')
+        sessionStorage.removeItem('briefEditMetadata')
         delete (window as any).__briefMediaFiles
       } else {
         setSaveStatus('error')
@@ -234,12 +256,18 @@ export default function ResponsePage() {
               <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
             </div>
             <h2 className="text-2xl font-bold text-card-foreground mb-2">
-              {isVerticalVideo ? 'Video Saved Successfully!' : 'Story Saved Successfully!'}
+              {isVerticalVideo
+                ? 'Video Saved Successfully!'
+                : isEditMode
+                  ? 'Story Updated Successfully!'
+                  : 'Story Saved Successfully!'}
             </h2>
             <p className="text-muted-foreground mb-4">
               {isVerticalVideo
                 ? 'Your video has been uploaded and saved.'
-                : 'Your story has been saved and is ready for review.'}
+                : isEditMode
+                  ? 'Your story has been updated successfully.'
+                  : 'Your story has been saved and is ready for review.'}
             </p>
             {savedVideoUrl && (
               <div className="mb-6 p-4 bg-muted/50 rounded-lg text-left">
@@ -280,7 +308,7 @@ export default function ResponsePage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => router.push(`/dashboard/create/content?format=${format}`)}
+                onClick={() => router.push(`/dashboard/create/content?format=${format}${isEditMode && storyId ? `&storyId=${storyId}` : ''}`)}
                 aria-label="Go back"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -289,7 +317,7 @@ export default function ResponsePage() {
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-primary-foreground text-sm font-bold">N</span>
                 </div>
-                <h1 className="text-xl font-bold text-foreground">New Post</h1>
+                <h1 className="text-xl font-bold text-foreground">{isEditMode ? 'Edit Post' : 'New Post'}</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -446,7 +474,7 @@ export default function ResponsePage() {
                 </p>
                 <Button
                   variant="outline"
-                  onClick={() => router.push(`/dashboard/create/content?format=${format}`)}
+                  onClick={() => router.push(`/dashboard/create/content?format=${format}${isEditMode && storyId ? `&storyId=${storyId}` : ''}`)}
                 >
                   Go Back
                 </Button>
@@ -558,7 +586,7 @@ export default function ResponsePage() {
                 </p>
                 <Button
                   variant="outline"
-                  onClick={() => router.push(`/dashboard/create/content?format=${format}`)}
+                  onClick={() => router.push(`/dashboard/create/content?format=${format}${isEditMode && storyId ? `&storyId=${storyId}` : ''}`)}
                 >
                   Go Back
                 </Button>
@@ -574,7 +602,7 @@ export default function ResponsePage() {
           <div className="flex justify-between items-center">
             <Button
               variant="ghost"
-              onClick={() => router.push(`/dashboard/create/content?format=${format}`)}
+              onClick={() => router.push(`/dashboard/create/content?format=${format}${isEditMode && storyId ? `&storyId=${storyId}` : ''}`)}
               disabled={saveStatus === 'saving'}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />

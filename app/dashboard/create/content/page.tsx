@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label'
 import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
-import type { SlideFormData, BriefFormData, QuizFormData, PollFormData } from '@/lib/supabase/types'
+import type { SlideFormData, BriefFormData, QuizFormData, PollFormData, EditBriefMetadata } from '@/lib/supabase/types'
+import { getFullBriefStory } from '@/lib/supabase/brief'
 import VerticalVideoContent from '@/components/create/vertical-video-content'
 
 interface Author {
@@ -37,12 +38,17 @@ export default function CreateContentPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const format = searchParams.get('format')
+  const storyId = searchParams.get('storyId')
   const isVerticalVideo = format === 'vertical-video'
+  const isEditMode = !!storyId
 
   // All hooks must be called unconditionally at the top
   const [user, setUser] = useState<any>(null)
   const [author, setAuthor] = useState<Author | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Edit mode metadata
+  const [editMetadata, setEditMetadata] = useState<EditBriefMetadata | null>(null)
 
   // Story form data - structured for backend integration
   const [storyData, setStoryData] = useState<BriefFormData>({
@@ -88,6 +94,10 @@ export default function CreateContentPage() {
         headlinePhoto: null,
         slideMedia: new Map(),
       }
+    }
+    // If edit mode, load existing story data
+    if (isEditMode && storyId) {
+      loadExistingStory(storyId)
     }
     // Cleanup object URLs on unmount
     return () => {
@@ -147,6 +157,18 @@ export default function CreateContentPage() {
       router.push('/')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadExistingStory = async (id: string) => {
+    try {
+      const result = await getFullBriefStory(id)
+      if (result) {
+        setStoryData(result.storyData)
+        setEditMetadata(result.editMetadata)
+      }
+    } catch (error) {
+      console.error('Error loading story for edit:', error)
     }
   }
 
@@ -294,6 +316,7 @@ export default function CreateContentPage() {
       story_headline: storyData.story_headline,
       headlinePhoto: null, // File stored in global
       headlinePhotoName: storyData.headlinePhoto?.name || null,
+      headlinePhotoUrl: storyData.headlinePhotoUrl || null,
       author_id: storyData.author_id,
       author_name: storyData.author_name,
       slides: storyData.slides.map(slide => ({
@@ -308,6 +331,7 @@ export default function CreateContentPage() {
         portrait_video: slide.portrait_video,
         mediaFiles: [], // Files stored in global
         mediaFileNames: slide.mediaFiles.map(f => f.name),
+        savedMediaUrls: slide.savedMediaUrls || [],
       })),
       // Include quiz and poll (optional, can be null)
       quiz: storyData.quiz,
@@ -315,8 +339,16 @@ export default function CreateContentPage() {
     }
     sessionStorage.setItem('briefDraftState', JSON.stringify(serializableState))
 
+    // Store edit metadata if in edit mode
+    if (isEditMode && editMetadata) {
+      sessionStorage.setItem('briefEditMetadata', JSON.stringify(editMetadata))
+    } else {
+      sessionStorage.removeItem('briefEditMetadata')
+    }
+
     // Navigate to next step (Response)
-    router.push(`/dashboard/create/response?format=${format}`)
+    const editParam = isEditMode && storyId ? `&storyId=${storyId}` : ''
+    router.push(`/dashboard/create/response?format=${format}${editParam}`)
   }
 
   // Render Vertical Video content for that format
@@ -343,7 +375,7 @@ export default function CreateContentPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => router.push('/dashboard/create')}
+                onClick={() => router.push(isEditMode ? '/dashboard' : '/dashboard/create')}
                 aria-label="Go back"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -352,7 +384,7 @@ export default function CreateContentPage() {
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-primary-foreground text-sm font-bold">N</span>
                 </div>
-                <h1 className="text-xl font-bold text-foreground">New Post</h1>
+                <h1 className="text-xl font-bold text-foreground">{isEditMode ? 'Edit Post' : 'New Post'}</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -452,30 +484,36 @@ export default function CreateContentPage() {
                         onChange={(e) => setStoryData(prev => ({ ...prev, headlinePhoto: e.target.files?.[0] || null }))}
                       />
                       <span className="text-sm text-muted-foreground">
-                        {storyData.headlinePhoto ? storyData.headlinePhoto.name : 'No file chosen'}
+                        {storyData.headlinePhoto
+                          ? storyData.headlinePhoto.name
+                          : (isEditMode && storyData.headlinePhotoUrl)
+                            ? 'Current cover photo'
+                            : 'No file chosen'}
                       </span>
                     </div>
-                    {/* Headline Photo Preview */}
-                    {headlinePhotoPreview && (
+                    {/* Headline Photo Preview - new file or existing URL */}
+                    {(headlinePhotoPreview || (isEditMode && storyData.headlinePhotoUrl && !storyData.headlinePhoto)) && (
                       <div className="relative w-full max-w-xs">
                         <img
-                          src={headlinePhotoPreview}
+                          src={headlinePhotoPreview || storyData.headlinePhotoUrl || ''}
                           alt="Headline preview"
                           className="w-full h-40 object-cover rounded-lg border border-border"
                         />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setStoryData(prev => ({ ...prev, headlinePhoto: null }))
-                            if (window.__briefMediaFiles) {
-                              window.__briefMediaFiles.headlinePhoto = null
-                            }
-                          }}
-                          className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
-                          aria-label="Remove image"
-                        >
-                          <X className="h-4 w-4 text-muted-foreground" />
-                        </button>
+                        {headlinePhotoPreview && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setStoryData(prev => ({ ...prev, headlinePhoto: null }))
+                              if (window.__briefMediaFiles) {
+                                window.__briefMediaFiles.headlinePhoto = null
+                              }
+                            }}
+                            className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
+                            aria-label="Remove image"
+                          >
+                            <X className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -626,10 +664,40 @@ export default function CreateContentPage() {
                                 <span className="text-sm text-muted-foreground">
                                   {slide.mediaFiles.length > 0
                                     ? `${slide.mediaFiles.length} file${slide.mediaFiles.length > 1 ? 's' : ''} chosen`
-                                    : 'No file chosen'}
+                                    : (slide.savedMediaUrls && slide.savedMediaUrls.length > 0)
+                                      ? 'Current media'
+                                      : 'No file chosen'}
                                 </span>
                               </div>
-                              {/* Slide Media Preview */}
+                              {/* Existing Media Preview (edit mode) */}
+                              {!slideMediaPreviews.get(slide.id) && slide.savedMediaUrls?.map((url, idx) => (
+                                <div key={`saved-${idx}`} className="relative w-full max-w-xs">
+                                  {url.includes('/video/') ? (
+                                    <div className="relative">
+                                      <video
+                                        src={url}
+                                        className="w-full h-40 object-cover rounded-lg border border-border"
+                                        controls={false}
+                                        muted
+                                      />
+                                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
+                                        <Video className="h-8 w-8 text-white" />
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <img
+                                      src={url}
+                                      alt={`Slide ${slide.slideIndex} media ${idx + 1}`}
+                                      className="w-full h-40 object-cover rounded-lg border border-border"
+                                    />
+                                  )}
+                                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-background/80 rounded text-xs text-muted-foreground flex items-center gap-1">
+                                    <ImageIcon className="h-3 w-3" />
+                                    Existing media
+                                  </div>
+                                </div>
+                              ))}
+                              {/* New File Media Preview */}
                               {slideMediaPreviews.get(slide.id)?.map((url, idx) => {
                                 const file = slide.mediaFiles[idx]
                                 const isVideo = file && isVideoFile(file)
