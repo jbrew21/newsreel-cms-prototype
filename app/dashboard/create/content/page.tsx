@@ -14,6 +14,9 @@ import { cn } from '@/lib/utils'
 import type { SlideFormData, BriefFormData, QuizFormData, PollFormData, EditBriefMetadata } from '@/lib/supabase/types'
 import { getFullBriefStory } from '@/lib/supabase/brief'
 import VerticalVideoContent from '@/components/create/vertical-video-content'
+import { MediaPickerModal } from '@/components/media-picker-modal'
+import { MediaSearchModal } from '@/components/media-search-modal'
+import type { MediaItem } from '@/lib/media-search/types'
 
 interface Author {
   id: string
@@ -81,6 +84,8 @@ export default function CreateContentPage() {
   // Track object URLs for cleanup
   const [headlinePhotoPreview, setHeadlinePhotoPreview] = useState<string | null>(null)
   const [slideMediaPreviews, setSlideMediaPreviews] = useState<Map<string, string[]>>(new Map())
+  const [mediaPickerSlideId, setMediaPickerSlideId] = useState<string | null>(null)
+  const [mediaSearchSlideId, setMediaSearchSlideId] = useState<string | null>(null)
 
   // Drag and drop state
   const [draggedSlideId, setDraggedSlideId] = useState<string | null>(null)
@@ -207,7 +212,7 @@ export default function CreateContentPage() {
     }))
   }
 
-  const handleSlideChange = (slideId: string, field: keyof SlideFormData, value: string | boolean | File[]) => {
+  const handleSlideChange = (slideId: string, field: keyof SlideFormData, value: string | boolean | File[] | string[]) => {
     setStoryData(prev => ({
       ...prev,
       slides: prev.slides.map(slide =>
@@ -243,6 +248,30 @@ export default function CreateContentPage() {
 
       // Update form state
       handleSlideChange(slideId, 'mediaFiles', fileArray)
+    }
+  }
+
+  const handleSearchMediaSelect = (slideId: string, item: MediaItem) => {
+    // Store the selected URL as a saved media URL on the slide
+    handleSlideChange(slideId, 'savedMediaUrls', [item.url])
+    // Clear any previously uploaded files for this slide
+    handleSlideChange(slideId, 'mediaFiles', [])
+    // Revoke old preview URLs
+    const oldUrls = slideMediaPreviews.get(slideId)
+    if (oldUrls) {
+      oldUrls.forEach(url => URL.revokeObjectURL(url))
+      setSlideMediaPreviews(prev => {
+        const newMap = new Map(prev)
+        newMap.delete(slideId)
+        return newMap
+      })
+    }
+    if (window.__briefMediaFiles) {
+      window.__briefMediaFiles.slideMedia.delete(slideId)
+    }
+    // Also store the media source attribution if available
+    if (item.attribution || item.source) {
+      handleSlideChange(slideId, 'slide_media_source', item.attribution || item.source)
     }
   }
 
@@ -645,14 +674,25 @@ export default function CreateContentPage() {
                               Image or Video <span className="text-muted-foreground font-normal">(optional)</span>
                             </Label>
                             <div className="space-y-3">
+                              <MediaPickerModal
+                                open={mediaPickerSlideId === slide.id}
+                                onOpenChange={(open) => setMediaPickerSlideId(open ? slide.id : null)}
+                                onUploadClick={() => document.getElementById(`image-input-${slide.id}`)?.click()}
+                                onSearchClick={() => setMediaSearchSlideId(slide.id)}
+                              />
+                              <MediaSearchModal
+                                open={mediaSearchSlideId === slide.id}
+                                onOpenChange={(open) => setMediaSearchSlideId(open ? slide.id : null)}
+                                onSelectMedia={(item) => handleSearchMediaSelect(slide.id, item)}
+                              />
                               <div className="flex items-center gap-3">
                                 <Button
                                   type="button"
                                   variant="outline"
-                                  onClick={() => document.getElementById(`image-input-${slide.id}`)?.click()}
+                                  onClick={() => setMediaPickerSlideId(slide.id)}
                                   className="bg-background"
                                 >
-                                  Choose File
+                                  Choose Media
                                 </Button>
                                 <input
                                   id={`image-input-${slide.id}`}
@@ -670,33 +710,37 @@ export default function CreateContentPage() {
                                 </span>
                               </div>
                               {/* Existing Media Preview (edit mode) */}
-                              {!slideMediaPreviews.get(slide.id) && slide.savedMediaUrls?.map((url, idx) => (
-                                <div key={`saved-${idx}`} className="relative w-full max-w-xs">
-                                  {url.includes('/video/') ? (
-                                    <div className="relative">
-                                      <video
-                                        src={url}
-                                        className="w-full h-40 object-cover rounded-lg border border-border"
-                                        controls={false}
-                                        muted
-                                      />
-                                      <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
-                                        <Video className="h-8 w-8 text-white" />
+                              {!slideMediaPreviews.get(slide.id) && slide.savedMediaUrls?.map((url, idx) => {
+                                const isVideoUrl = url.includes('/video/') || /\.(mp4|mov|webm|avi)(\?|$)/i.test(url)
+                                return (
+                                  <div key={`saved-${idx}`} className="relative w-full max-w-xs">
+                                    {isVideoUrl ? (
+                                      <div className="relative">
+                                        <video
+                                          src={url}
+                                          className="w-full h-40 object-cover rounded-lg border border-border"
+                                          controls={false}
+                                          muted
+                                          preload="metadata"
+                                        />
+                                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
+                                          <Video className="h-8 w-8 text-white" />
+                                        </div>
                                       </div>
+                                    ) : (
+                                      <img
+                                        src={url}
+                                        alt={`Slide ${slide.slideIndex} media ${idx + 1}`}
+                                        className="w-full h-40 object-cover rounded-lg border border-border"
+                                      />
+                                    )}
+                                    <div className="absolute bottom-2 left-2 px-2 py-1 bg-background/80 rounded text-xs text-muted-foreground flex items-center gap-1">
+                                      <ImageIcon className="h-3 w-3" />
+                                      Existing media
                                     </div>
-                                  ) : (
-                                    <img
-                                      src={url}
-                                      alt={`Slide ${slide.slideIndex} media ${idx + 1}`}
-                                      className="w-full h-40 object-cover rounded-lg border border-border"
-                                    />
-                                  )}
-                                  <div className="absolute bottom-2 left-2 px-2 py-1 bg-background/80 rounded text-xs text-muted-foreground flex items-center gap-1">
-                                    <ImageIcon className="h-3 w-3" />
-                                    Existing media
                                   </div>
-                                </div>
-                              ))}
+                                )
+                              })}
                               {/* New File Media Preview */}
                               {slideMediaPreviews.get(slide.id)?.map((url, idx) => {
                                 const file = slide.mediaFiles[idx]
