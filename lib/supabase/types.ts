@@ -39,6 +39,8 @@ export interface Story {
   newsreel_id: string | null
   story_headline: string | null
   story_link: string | null
+  story_type: string | null
+  story_date: string | null
   university: string | null
   is_premium: boolean
   is_k12: boolean
@@ -159,6 +161,8 @@ export interface StoryInsert {
   newsreel_id?: string | null
   story_headline?: string | null
   story_link?: string | null
+  story_type?: string | null
+  story_date?: string | null
   university?: string | null
   is_premium?: boolean
   is_k12?: boolean
@@ -285,6 +289,8 @@ export interface BriefFormData {
   headlinePhotoUrl?: string // After save
   author_id: string | null
   author_name: string
+  story_type?: string | null // Optional - defaults to 'brief'
+  story_date?: string | null // Optional - defaults to published_at or updated_at
   slides: SlideFormData[]
   // Optional quiz and poll
   quiz?: QuizFormData | null

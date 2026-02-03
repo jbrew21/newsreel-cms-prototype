@@ -55,8 +55,15 @@ export async function saveBriefPost(params: {
     // ========================================
     // Step 1: Create Story Record
     // ========================================
+    // If no story_date provided, use the publish date or current date
+    const storyDate = draftState.story_date || (publishedAt ? publishedAt.split('T')[0] : new Date().toISOString().split('T')[0])
+    // If no story_type provided, default to 'brief'
+    const storyType = draftState.story_type?.trim() || 'brief'
+
     const storyInsert: StoryInsert = {
       story_headline: draftState.story_headline || null,
+      story_date: storyDate,
+      story_type: storyType,
       published_at: publishedAt,
       // Default values for brief format
       is_premium: false,
@@ -464,6 +471,8 @@ export async function getFullBriefStory(storyId: string): Promise<{
     headlinePhotoUrl: coverUrl || undefined,
     author_id: authorId,
     author_name: authorName,
+    story_type: story.story_type || null,
+    story_date: story.story_date || null,
     slides,
     quiz: quizFormData,
     poll: pollFormData,
@@ -505,10 +514,17 @@ export async function updateBriefPost(params: {
     // ========================================
     // Step 1: Update Story Record
     // ========================================
+    // If no story_date provided, keep existing or use publish/update date
+    const storyDate = draftState.story_date || (publishedAt ? publishedAt.split('T')[0] : new Date().toISOString().split('T')[0])
+    // If no story_type provided, default to 'brief'
+    const storyType = draftState.story_type?.trim() || 'brief'
+
     const { error: storyError } = await supabase
       .from('stories')
       .update({
         story_headline: draftState.story_headline || null,
+        story_date: storyDate,
+        story_type: storyType,
         published_at: publishedAt,
         updated_at: new Date().toISOString(),
       })

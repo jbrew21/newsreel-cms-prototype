@@ -561,6 +561,43 @@ export default function CreateContentPage() {
                     className="bg-background"
                   />
                 </div>
+
+                {/* Story Type & Date Row */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Story Type */}
+                  <div className="space-y-2">
+                    <Label htmlFor="story-type" className="text-foreground">
+                      Story Type
+                    </Label>
+                    <Input
+                      id="story-type"
+                      value={storyData.story_type || ''}
+                      onChange={(e) => setStoryData(prev => ({ ...prev, story_type: e.target.value || null }))}
+                      placeholder="e.g. explainer, feature, brief"
+                      className="bg-background"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional. Defaults to &quot;brief&quot; if empty.
+                    </p>
+                  </div>
+
+                  {/* Story Date */}
+                  <div className="space-y-2">
+                    <Label htmlFor="story-date" className="text-foreground">
+                      Story Date
+                    </Label>
+                    <Input
+                      id="story-date"
+                      type="date"
+                      value={storyData.story_date || ''}
+                      onChange={(e) => setStoryData(prev => ({ ...prev, story_date: e.target.value || null }))}
+                      className="bg-background"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Optional. Defaults to publish/draft date.
+                    </p>
+                  </div>
+                </div>
               </div>
             </Card>
 
