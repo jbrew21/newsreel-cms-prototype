@@ -11,9 +11,14 @@ export interface Author {
   author_first_name: string | null
   author_last_name: string | null
   author_bio: string | null
+  author_role: string | null
+  author_organization: string | null
   author_twitter: string | null
   author_linked_in: string | null
   author_email: string | null
+  author_avatar: string | null
+  author_cover: string | null
+  is_first_login: boolean | null
   created_at: string | null
   updated_at: string | null
   published_at: string | null

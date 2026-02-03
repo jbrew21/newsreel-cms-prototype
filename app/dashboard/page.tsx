@@ -19,6 +19,7 @@ interface Author {
   author_role: string | null
   author_organization: string | null
   author_avatar: string | null
+  author_cover: string | null
   is_first_login: boolean | null
   created_at: string | null
 }
@@ -320,18 +321,34 @@ export default function DashboardPage() {
         {/* Author Info and Overall Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Author Profile Card */}
-          <Card className="p-6">
-            <div className="flex flex-col items-center text-center">
+          <Card className="overflow-hidden">
+            {author?.author_cover && (
+              <div className="h-24 w-full">
+                <img
+                  src={author.author_cover}
+                  alt="Cover"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+            <div className={cn(
+              "flex flex-col items-center text-center p-6",
+              author?.author_cover && "-mt-8"
+            )}>
               {author?.author_avatar ? (
                 <img
                   src={author.author_avatar}
                   alt={getAuthorName()}
-                  className="w-16 h-16 rounded-full object-cover mb-4"
+                  className={cn(
+                    "w-16 h-16 rounded-full object-cover mb-4",
+                    author?.author_cover && "ring-4 ring-card"
+                  )}
                 />
               ) : (
                 <div className={cn(
                   "w-16 h-16 rounded-full flex items-center justify-center mb-4",
-                  "bg-primary text-primary-foreground"
+                  "bg-primary text-primary-foreground",
+                  author?.author_cover && "ring-4 ring-card"
                 )}>
                   <span className="text-xl font-bold">
                     {getAuthorInitials()}

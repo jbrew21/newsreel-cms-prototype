@@ -10,10 +10,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
-import { Camera, Loader2, User } from 'lucide-react'
+import { Camera, ImageIcon, Loader2, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const AVATAR_BUCKET = 'author-avatars'
+const COVER_BUCKET = 'author-covers'
 
 interface FormData {
   author_first_name: string
@@ -60,6 +61,9 @@ function OnboardingContent() {
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
+  const [coverFile, setCoverFile] = useState<File | null>(null)
+  const [coverPreview, setCoverPreview] = useState<string | null>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState<FormData>({
     author_first_name: '',
@@ -115,6 +119,9 @@ function OnboardingContent() {
           if (authorData.author_avatar) {
             setAvatarPreview(authorData.author_avatar)
           }
+          if (authorData.author_cover) {
+            setCoverPreview(authorData.author_cover)
+          }
         }
       }
     } catch (error) {
@@ -150,6 +157,23 @@ function OnboardingContent() {
       setAvatarFile(file)
       setAvatarPreview(URL.createObjectURL(file))
       setErrors(prev => ({ ...prev, avatar: undefined }))
+    }
+  }
+
+  const handleCoverSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        return
+      }
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        return
+      }
+
+      setCoverFile(file)
+      setCoverPreview(URL.createObjectURL(file))
     }
   }
 
@@ -211,6 +235,29 @@ function OnboardingContent() {
         avatarUrl = urlData.publicUrl
       }
 
+      let coverUrl = coverPreview
+
+      // Upload cover if new file selected
+      if (coverFile) {
+        const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '_')
+        const fileExt = coverFile.name.split('.').pop()?.toLowerCase() || 'jpg'
+        const coverPath = `${sanitizedEmail}.${fileExt}`
+
+        const { error: uploadError } = await supabase.storage
+          .from(COVER_BUCKET)
+          .upload(coverPath, coverFile, { upsert: true })
+
+        if (uploadError) {
+          throw new Error(`Failed to upload cover: ${uploadError.message}`)
+        }
+
+        const { data: urlData } = supabase.storage
+          .from(COVER_BUCKET)
+          .getPublicUrl(coverPath)
+
+        coverUrl = urlData.publicUrl
+      }
+
       // Update author record
       const { error: updateError } = await supabase
         .from('authors')
@@ -223,6 +270,7 @@ function OnboardingContent() {
           author_twitter: formData.author_twitter.trim() || null,
           author_linked_in: formData.author_linked_in.trim() || null,
           author_avatar: avatarUrl,
+          author_cover: coverUrl,
           is_first_login: false,
           updated_at: new Date().toISOString(),
         })
@@ -315,6 +363,41 @@ function OnboardingContent() {
             {errors.avatar && (
               <p className="text-sm text-destructive mt-1">{errors.avatar}</p>
             )}
+          </div>
+
+          {/* Cover Upload */}
+          <div className="mb-8">
+            <div
+              onClick={() => coverInputRef.current?.click()}
+              className={cn(
+                "w-full h-32 rounded-lg flex items-center justify-center cursor-pointer",
+                "border-2 border-dashed transition-colors overflow-hidden",
+                "border-border hover:border-primary bg-muted"
+              )}
+            >
+              {coverPreview ? (
+                <img
+                  src={coverPreview}
+                  alt="Cover preview"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="flex flex-col items-center text-muted-foreground">
+                  <ImageIcon className="h-8 w-8 mb-1" />
+                  <span className="text-xs">Upload Cover Image</span>
+                </div>
+              )}
+            </div>
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleCoverSelect}
+              className="hidden"
+            />
+            <p className="text-sm text-muted-foreground mt-2 text-center">
+              Cover Image (Optional)
+            </p>
           </div>
 
           {/* Form Fields */}
