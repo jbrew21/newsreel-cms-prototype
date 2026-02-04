@@ -493,7 +493,7 @@ export default function CreateContentPage() {
                 {/* Headline Photo */}
                 <div className="space-y-2">
                   <Label htmlFor="headline-photo" className="text-foreground">
-                    Headline Photo<span className="text-primary ml-1">*</span>
+                    Cover Media<span className="text-primary ml-1">*</span>
                   </Label>
                   <div className="space-y-3">
                     <div className="flex items-center gap-3">
@@ -508,7 +508,7 @@ export default function CreateContentPage() {
                       <input
                         id="headline-photo-input"
                         type="file"
-                        accept="image/*"
+                        accept="image/*,video/*"
                         className="hidden"
                         onChange={(e) => setStoryData(prev => ({ ...prev, headlinePhoto: e.target.files?.[0] || null }))}
                       />
@@ -516,18 +516,36 @@ export default function CreateContentPage() {
                         {storyData.headlinePhoto
                           ? storyData.headlinePhoto.name
                           : (isEditMode && storyData.headlinePhotoUrl)
-                            ? 'Current cover photo'
+                            ? 'Current cover media'
                             : 'No file chosen'}
                       </span>
                     </div>
-                    {/* Headline Photo Preview - new file or existing URL */}
+                    {/* Headline Photo/Video Preview - new file or existing URL */}
                     {(headlinePhotoPreview || (isEditMode && storyData.headlinePhotoUrl && !storyData.headlinePhoto)) && (
                       <div className="relative w-full max-w-xs">
-                        <img
-                          src={headlinePhotoPreview || storyData.headlinePhotoUrl || ''}
-                          alt="Headline preview"
-                          className="w-full h-40 object-cover rounded-lg border border-border"
-                        />
+                        {/* Check if it's a video - either from File type or URL pattern */}
+                        {(storyData.headlinePhoto?.type.startsWith('video/') ||
+                          (!storyData.headlinePhoto && storyData.headlinePhotoUrl &&
+                           (storyData.headlinePhotoUrl.includes('/video/') || /\.(mp4|mov|webm|avi)(\?|$)/i.test(storyData.headlinePhotoUrl)))) ? (
+                          <div className="relative">
+                            <video
+                              src={headlinePhotoPreview || storyData.headlinePhotoUrl || ''}
+                              className="w-full h-40 object-cover rounded-lg border border-border"
+                              controls={false}
+                              muted
+                              preload="metadata"
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
+                              <Video className="h-8 w-8 text-white" />
+                            </div>
+                          </div>
+                        ) : (
+                          <img
+                            src={headlinePhotoPreview || storyData.headlinePhotoUrl || ''}
+                            alt="Headline preview"
+                            className="w-full h-40 object-cover rounded-lg border border-border"
+                          />
+                        )}
                         {headlinePhotoPreview && (
                           <button
                             type="button"
@@ -538,7 +556,7 @@ export default function CreateContentPage() {
                               }
                             }}
                             className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
-                            aria-label="Remove image"
+                            aria-label="Remove media"
                           >
                             <X className="h-4 w-4 text-muted-foreground" />
                           </button>

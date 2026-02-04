@@ -229,6 +229,122 @@ export async function insertVideoFeedMedia(params: {
 }
 
 // ============================================
+// External URL Download Utilities
+// ============================================
+
+/**
+ * Extract file extension from a URL
+ */
+export function getExtensionFromUrl(url: string): string {
+  try {
+    const urlObj = new URL(url)
+    const pathname = urlObj.pathname
+    const lastDot = pathname.lastIndexOf('.')
+    if (lastDot !== -1) {
+      const ext = pathname.slice(lastDot + 1).toLowerCase().split('?')[0]
+      if (ext && ext.length <= 5) {
+        return ext
+      }
+    }
+  } catch {
+    // Ignore URL parsing errors
+  }
+  // Default based on common patterns
+  if (url.includes('/video/') || url.includes('video')) {
+    return 'mp4'
+  }
+  return 'jpg'
+}
+
+/**
+ * Determine media type from URL
+ */
+export function getMediaTypeFromUrl(url: string): MediaType {
+  const videoExtensions = ['mp4', 'mov', 'webm', 'avi', 'mkv', 'm4v']
+  const ext = getExtensionFromUrl(url)
+  if (videoExtensions.includes(ext)) {
+    return 'video'
+  }
+  // Also check URL patterns
+  if (url.includes('/video/') || url.includes('/videos/')) {
+    return 'video'
+  }
+  return 'image'
+}
+
+/**
+ * Download media from an external URL and return as Blob
+ * @throws Error if download fails
+ */
+export async function downloadExternalMedia(url: string): Promise<{
+  blob: Blob
+  mimeType: string
+  size: number
+}> {
+  const response = await fetch(url)
+
+  if (!response.ok) {
+    throw new Error(`Failed to download media from ${url}: ${response.status} ${response.statusText}`)
+  }
+
+  const blob = await response.blob()
+  const mimeType = response.headers.get('content-type') || blob.type || 'application/octet-stream'
+
+  return {
+    blob,
+    mimeType,
+    size: blob.size,
+  }
+}
+
+/**
+ * Download external media URL, upload to storage, and create media asset record
+ * @returns The media asset ID and public URL
+ */
+export async function uploadExternalMediaAndCreateAsset(params: {
+  externalUrl: string
+  bucket: string
+  objectPath: string
+  createdBy?: string | null
+}): Promise<{ mediaId: string; publicUrl: string }> {
+  const { externalUrl, bucket, objectPath, createdBy } = params
+
+  // Download the external media
+  const { blob, mimeType, size } = await downloadExternalMedia(externalUrl)
+
+  // Upload to storage
+  const { error: uploadError } = await supabase.storage
+    .from(bucket)
+    .upload(objectPath, blob, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: mimeType,
+    })
+
+  if (uploadError) {
+    throw new Error(`Failed to upload external media: ${uploadError.message}`)
+  }
+
+  // Determine media type
+  const mediaType = getMediaTypeFromUrl(externalUrl)
+
+  // Create media asset record
+  const mediaId = await insertMediaAsset({
+    bucket,
+    object_path: objectPath,
+    media_type: mediaType,
+    mime_type: mimeType,
+    bytes: size,
+    created_by: createdBy,
+  })
+
+  // Get public URL
+  const publicUrl = getPublicUrl(bucket, objectPath)
+
+  return { mediaId, publicUrl }
+}
+
+// ============================================
 // Composite Upload + Insert Operations
 // ============================================
 

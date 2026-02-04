@@ -2,10 +2,12 @@ import { supabase } from './client'
 import {
   STORAGE_BUCKET,
   getFileExtension,
+  getExtensionFromUrl,
   getPublicUrl,
   buildObjectPathForStoryCover,
   buildObjectPathForSlideMedia,
   uploadAndCreateMediaAsset,
+  uploadExternalMediaAndCreateAsset,
   insertStoryMedia,
   insertSlideMedia,
 } from './storage'
@@ -179,6 +181,43 @@ export async function saveBriefPost(params: {
             role,
             sort_order: j,
           })
+        }
+      } else if (slide.savedMediaUrls && slide.savedMediaUrls.length > 0) {
+        // Handle external URLs from media search (Pexels, Unsplash, etc.)
+        // Download and upload to our storage bucket
+        for (let j = 0; j < slide.savedMediaUrls.length; j++) {
+          const externalUrl = slide.savedMediaUrls[j]
+          const ext = getExtensionFromUrl(externalUrl)
+          const tempMediaId = crypto.randomUUID()
+          const role = 'hero'
+          const objectPath = buildObjectPathForSlideMedia(
+            storyId,
+            slideId,
+            role,
+            tempMediaId,
+            ext
+          )
+
+          try {
+            // Download external media and upload to our storage
+            const { mediaId } = await uploadExternalMediaAndCreateAsset({
+              externalUrl,
+              bucket: STORAGE_BUCKET,
+              objectPath,
+              createdBy: userId,
+            })
+
+            // Link media to slide
+            await insertSlideMedia({
+              slide_id: slideId,
+              media_id: mediaId,
+              role,
+              sort_order: j,
+            })
+          } catch (error) {
+            console.error(`Failed to download/upload external media for slide ${i + 1}:`, error)
+            // Continue with other slides even if one media fails
+          }
         }
       }
     }
@@ -675,8 +714,52 @@ export async function updateBriefPost(params: {
               sort_order: j,
             })
           }
+        } else if (slide.savedMediaUrls && slide.savedMediaUrls.length > 0) {
+          // Handle external URLs from media search - delete old media first
+          const { data: oldSlideMedia } = await supabase
+            .from('slide_media')
+            .select('media_id, media_assets ( id, bucket, object_path )')
+            .eq('slide_id', slide.id)
+
+          if (oldSlideMedia) {
+            for (const link of oldSlideMedia) {
+              const asset = (link as any).media_assets
+              if (asset) {
+                await supabase.storage.from(asset.bucket).remove([asset.object_path])
+                await supabase.from('slide_media').delete().eq('slide_id', slide.id).eq('media_id', link.media_id)
+                await supabase.from('media_assets').delete().eq('id', asset.id)
+              }
+            }
+          }
+
+          // Download and upload external media
+          for (let j = 0; j < slide.savedMediaUrls.length; j++) {
+            const externalUrl = slide.savedMediaUrls[j]
+            const ext = getExtensionFromUrl(externalUrl)
+            const tempMediaId = crypto.randomUUID()
+            const role = 'hero'
+            const objectPath = buildObjectPathForSlideMedia(storyId, slide.id, role, tempMediaId, ext)
+
+            try {
+              const { mediaId } = await uploadExternalMediaAndCreateAsset({
+                externalUrl,
+                bucket: STORAGE_BUCKET,
+                objectPath,
+                createdBy: userId,
+              })
+
+              await insertSlideMedia({
+                slide_id: slide.id,
+                media_id: mediaId,
+                role,
+                sort_order: j,
+              })
+            } catch (error) {
+              console.error(`Failed to download/upload external media for existing slide:`, error)
+            }
+          }
         }
-        // If no new mediaFiles, existing media is kept
+        // If no new mediaFiles or savedMediaUrls, existing media is kept
       } else {
         // Insert new slide
         const slideInsert: SlideInsert = {
@@ -726,6 +809,33 @@ export async function updateBriefPost(params: {
               role,
               sort_order: j,
             })
+          }
+        } else if (slide.savedMediaUrls && slide.savedMediaUrls.length > 0) {
+          // Handle external URLs from media search for new slide
+          for (let j = 0; j < slide.savedMediaUrls.length; j++) {
+            const externalUrl = slide.savedMediaUrls[j]
+            const ext = getExtensionFromUrl(externalUrl)
+            const tempMediaId = crypto.randomUUID()
+            const role = 'hero'
+            const objectPath = buildObjectPathForSlideMedia(storyId, newSlideId, role, tempMediaId, ext)
+
+            try {
+              const { mediaId } = await uploadExternalMediaAndCreateAsset({
+                externalUrl,
+                bucket: STORAGE_BUCKET,
+                objectPath,
+                createdBy: userId,
+              })
+
+              await insertSlideMedia({
+                slide_id: newSlideId,
+                media_id: mediaId,
+                role,
+                sort_order: j,
+              })
+            } catch (error) {
+              console.error(`Failed to download/upload external media for new slide:`, error)
+            }
           }
         }
       }
