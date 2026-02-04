@@ -490,6 +490,20 @@ export default function CreateContentPage() {
                   />
                 </div>
 
+                {/* Subhead */}
+                <div className="space-y-2">
+                  <Label htmlFor="subhead" className="text-foreground">
+                    Subhead
+                  </Label>
+                  <Input
+                    id="subhead"
+                    value={storyData.subhead || ''}
+                    onChange={(e) => setStoryData(prev => ({ ...prev, subhead: e.target.value || null }))}
+                    placeholder="Enter subhead (optional)"
+                    className="bg-background"
+                  />
+                </div>
+
                 {/* Headline Photo */}
                 <div className="space-y-2">
                   <Label htmlFor="headline-photo" className="text-foreground">

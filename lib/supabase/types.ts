@@ -38,6 +38,7 @@ export interface Story {
   id: string
   newsreel_id: string | null
   story_headline: string | null
+  subhead: string | null
   story_link: string | null
   story_type: string | null
   story_date: string | null
@@ -160,6 +161,7 @@ export interface Quiz {
 export interface StoryInsert {
   newsreel_id?: string | null
   story_headline?: string | null
+  subhead?: string | null
   story_link?: string | null
   story_type?: string | null
   story_date?: string | null
@@ -285,6 +287,7 @@ export interface PollFormData {
 
 export interface BriefFormData {
   story_headline: string
+  subhead?: string | null
   headlinePhoto: File | null
   headlinePhotoUrl?: string // After save
   author_id: string | null

@@ -64,6 +64,7 @@ export async function saveBriefPost(params: {
 
     const storyInsert: StoryInsert = {
       story_headline: draftState.story_headline || null,
+      subhead: draftState.subhead?.trim() || null,
       story_date: storyDate,
       story_type: storyType,
       published_at: publishedAt,
@@ -506,6 +507,7 @@ export async function getFullBriefStory(storyId: string): Promise<{
 
   const storyData: BriefFormData = {
     story_headline: story.story_headline || '',
+    subhead: story.subhead || null,
     headlinePhoto: null, // Can't fetch File from URL
     headlinePhotoUrl: coverUrl || undefined,
     author_id: authorId,
@@ -562,6 +564,7 @@ export async function updateBriefPost(params: {
       .from('stories')
       .update({
         story_headline: draftState.story_headline || null,
+        subhead: draftState.subhead?.trim() || null,
         story_date: storyDate,
         story_type: storyType,
         published_at: publishedAt,
