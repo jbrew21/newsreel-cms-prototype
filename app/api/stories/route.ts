@@ -54,7 +54,10 @@ export async function GET(request: NextRequest) {
             id,
             author_first_name,
             author_last_name,
-            author_avatar
+            author_avatar,
+            author_role,
+            author_organization,
+            author_bio
           )
         )
       `, { count: 'exact' })

@@ -72,6 +72,9 @@ export function buildStorySummary(story: any, coverUrl: string | null, author: a
           id: author.id,
           name: `${author.author_first_name || ''} ${author.author_last_name || ''}`.trim(),
           avatar_url: author.author_avatar || null,
+          role: author.author_role || null,
+          organization: author.author_organization || null,
+          bio: author.author_bio || null,
         }
       : null,
     slide_count: story.slides?.length || 0,
