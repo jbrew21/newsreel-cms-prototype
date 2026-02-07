@@ -75,6 +75,7 @@ export function buildStorySummary(story: any, coverUrl: string | null, author: a
           role: author.author_role || null,
           organization: author.author_organization || null,
           bio: author.author_bio || null,
+          cover_url: author.author_cover || null,
         }
       : null,
     slide_count: story.slides?.length || 0,
