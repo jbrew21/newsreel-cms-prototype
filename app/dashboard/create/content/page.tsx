@@ -103,6 +103,9 @@ export default function CreateContentPage() {
     // If edit mode, load existing story data
     if (isEditMode && storyId) {
       loadExistingStory(storyId)
+    } else {
+      // Restore draft from sessionStorage (e.g. when navigating back from review page)
+      restoreDraftFromSession()
     }
     // Cleanup object URLs on unmount
     return () => {
@@ -174,6 +177,68 @@ export default function CreateContentPage() {
       }
     } catch (error) {
       console.error('Error loading story for edit:', error)
+    }
+  }
+
+  const restoreDraftFromSession = () => {
+    try {
+      const stored = sessionStorage.getItem('briefDraftState')
+      if (!stored) return
+
+      const parsed = JSON.parse(stored)
+      if (!parsed.story_headline && (!parsed.slides || parsed.slides.length === 0)) return
+
+      // Restore text/serializable data into storyData
+      setStoryData(prev => ({
+        ...prev,
+        story_headline: parsed.story_headline || '',
+        subhead: parsed.subhead || null,
+        headlinePhoto: window.__briefMediaFiles?.headlinePhoto || null,
+        headlinePhotoUrl: parsed.headlinePhotoUrl || null,
+        author_id: parsed.author_id || prev.author_id,
+        author_name: parsed.author_name || prev.author_name,
+        story_type: parsed.story_type || null,
+        story_date: parsed.story_date || null,
+        slides: (parsed.slides || []).map((slide: any) => ({
+          id: slide.id,
+          slideIndex: slide.slideIndex,
+          slide_headline_1: slide.slide_headline_1 || '',
+          slide_content_1: slide.slide_content_1 || '',
+          slide_headline_2: slide.slide_headline_2 || '',
+          slide_content_2: slide.slide_content_2 || '',
+          slide_quote: slide.slide_quote || '',
+          slide_media_source: slide.slide_media_source || '',
+          portrait_video: slide.portrait_video || false,
+          mediaFiles: window.__briefMediaFiles?.slideMedia?.get(slide.id) || [],
+          savedMediaUrls: slide.savedMediaUrls || [],
+        })),
+        quiz: parsed.quiz || null,
+        poll: parsed.poll || null,
+      }))
+
+      // Restore headline photo preview from window global
+      if (window.__briefMediaFiles?.headlinePhoto) {
+        const url = URL.createObjectURL(window.__briefMediaFiles.headlinePhoto)
+        setHeadlinePhotoPreview(url)
+      } else if (parsed.headlinePhotoUrl) {
+        setHeadlinePhotoPreview(parsed.headlinePhotoUrl)
+      }
+
+      // Restore slide media previews from window global or savedMediaUrls
+      const newPreviews = new Map<string, string[]>()
+      for (const slide of parsed.slides || []) {
+        const files = window.__briefMediaFiles?.slideMedia?.get(slide.id)
+        if (files && files.length > 0) {
+          newPreviews.set(slide.id, files.map((f: File) => URL.createObjectURL(f)))
+        } else if (slide.savedMediaUrls && slide.savedMediaUrls.length > 0) {
+          newPreviews.set(slide.id, slide.savedMediaUrls)
+        }
+      }
+      if (newPreviews.size > 0) {
+        setSlideMediaPreviews(newPreviews)
+      }
+    } catch (error) {
+      console.error('Error restoring draft from session:', error)
     }
   }
 

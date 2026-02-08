@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { saveBriefPost, updateBriefPost } from '@/lib/supabase/brief'
 import { saveVerticalVideoPost } from '@/lib/supabase/video-feed'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ArrowLeft, Check, FileText, Loader2, CheckCircle2, Video, HelpCircle, BarChart3 } from 'lucide-react'
+import { ArrowLeft, Check, FileText, Loader2, CheckCircle2, Video, HelpCircle, BarChart3, Image as ImageIcon, Play, User } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
 import type { BriefFormData, VerticalVideoFormData, SaveMode, EditBriefMetadata } from '@/lib/supabase/types'
@@ -39,6 +39,18 @@ export default function ResponsePage() {
   const [savedStoryId, setSavedStoryId] = useState<string | null>(null)
   const [savedVideoUrl, setSavedVideoUrl] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [previewUrls, setPreviewUrls] = useState<{
+    coverUrl: string | null
+    slideMediaUrls: Map<string, string[]>
+    videoUrl: string | null
+    posterUrl: string | null
+  }>({
+    coverUrl: null,
+    slideMediaUrls: new Map(),
+    videoUrl: null,
+    posterUrl: null,
+  })
+  const objectUrlsRef = useRef<string[]>([])
 
   useEffect(() => {
     checkUser()
@@ -73,6 +85,74 @@ export default function ResponsePage() {
     }
   }
 
+  // Build preview URLs from File objects and existing URLs
+  useEffect(() => {
+    const urls: string[] = []
+
+    if (isVerticalVideo) {
+      const storedFiles = (window as any).__verticalVideoMediaFiles as {
+        videoFile: File | null
+        posterFile: File | null
+      } | undefined
+
+      let vUrl: string | null = null
+      let pUrl: string | null = null
+
+      if (storedFiles?.videoFile) {
+        vUrl = URL.createObjectURL(storedFiles.videoFile)
+        urls.push(vUrl)
+      } else if (videoDraftState?.videoUrl) {
+        vUrl = videoDraftState.videoUrl
+      }
+
+      if (storedFiles?.posterFile) {
+        pUrl = URL.createObjectURL(storedFiles.posterFile)
+        urls.push(pUrl)
+      } else if (videoDraftState?.posterUrl) {
+        pUrl = videoDraftState.posterUrl
+      }
+
+      setPreviewUrls(prev => ({ ...prev, videoUrl: vUrl, posterUrl: pUrl }))
+    } else if (draftState) {
+      const storedFiles = (window as any).__briefMediaFiles as {
+        headlinePhoto: File | null
+        slideMedia: Map<string, File[]>
+      } | undefined
+
+      let coverUrl: string | null = null
+      if (storedFiles?.headlinePhoto) {
+        coverUrl = URL.createObjectURL(storedFiles.headlinePhoto)
+        urls.push(coverUrl)
+      } else if ((draftState as any).headlinePhotoUrl) {
+        coverUrl = (draftState as any).headlinePhotoUrl
+      }
+
+      const slideMediaUrls = new Map<string, string[]>()
+      for (const slide of draftState.slides) {
+        const fileMedia = storedFiles?.slideMedia?.get(slide.id)
+        if (fileMedia && fileMedia.length > 0) {
+          const slideUrls = fileMedia.map(file => {
+            const u = URL.createObjectURL(file)
+            urls.push(u)
+            return u
+          })
+          slideMediaUrls.set(slide.id, slideUrls)
+        } else if (slide.savedMediaUrls && slide.savedMediaUrls.length > 0) {
+          slideMediaUrls.set(slide.id, slide.savedMediaUrls)
+        }
+      }
+
+      setPreviewUrls(prev => ({ ...prev, coverUrl, slideMediaUrls }))
+    }
+
+    objectUrlsRef.current = urls
+
+    return () => {
+      objectUrlsRef.current.forEach(u => URL.revokeObjectURL(u))
+      objectUrlsRef.current = []
+    }
+  }, [draftState, videoDraftState])
+
   const loadDraftState = () => {
     try {
       if (isVerticalVideo) {
@@ -103,6 +183,31 @@ export default function ResponsePage() {
       return `${author.author_first_name || ''} ${author.author_last_name || ''}`.trim()
     }
     return user?.email?.split('@')[0] || 'Author'
+  }
+
+  const isVideoUrl = (url: string): boolean => {
+    return url.includes('/video/') || /\.(mp4|mov|webm|avi)(\?|$)/i.test(url)
+  }
+
+  const isVideoFile = (slideId: string): boolean => {
+    const storedFiles = (window as any).__briefMediaFiles as {
+      headlinePhoto: File | null
+      slideMedia: Map<string, File[]>
+    } | undefined
+    const files = storedFiles?.slideMedia?.get(slideId)
+    return files?.[0]?.type?.startsWith('video/') || false
+  }
+
+  const isCoverVideo = (): boolean => {
+    const storedFiles = (window as any).__briefMediaFiles as {
+      headlinePhoto: File | null
+      slideMedia: Map<string, File[]>
+    } | undefined
+    if (storedFiles?.headlinePhoto?.type?.startsWith('video/')) return true
+    if (!storedFiles?.headlinePhoto && (draftState as any)?.headlinePhotoUrl) {
+      return isVideoUrl((draftState as any).headlinePhotoUrl)
+    }
+    return false
   }
 
   const handleSave = async (mode: SaveMode) => {
@@ -378,87 +483,96 @@ export default function ResponsePage() {
         <Card className="p-8">
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-card-foreground mb-2">
-              Review & Save
+              Preview & Publish
             </h2>
             <p className="text-muted-foreground">
-              Review your story summary below, then save as draft or publish immediately.
+              Preview your story below, then save as draft or publish immediately.
             </p>
           </div>
 
-          {/* Content Summary */}
+          {/* Content Preview */}
           {isVerticalVideo ? (
-            // Vertical Video Summary
+            // Vertical Video Preview
             videoDraftState ? (
               <div className="space-y-6">
-                {/* Headline */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Headline
-                  </div>
-                  <div className="text-lg font-semibold text-card-foreground">
-                    {videoDraftState.headline || '(No headline)'}
+                {/* Phone Frame Video Preview */}
+                <div className="flex justify-center">
+                  <div className="bg-card rounded-[3rem] p-[6px] shadow-lg" style={{ width: '240px', aspectRatio: '9/19' }}>
+                    <div className="bg-background rounded-[2.5rem] h-full overflow-hidden relative">
+                      {previewUrls.videoUrl ? (
+                        <video
+                          src={previewUrls.videoUrl}
+                          className="w-full h-full object-cover"
+                          controls={false}
+                          muted
+                          loop
+                          playsInline
+                          autoPlay
+                        />
+                      ) : previewUrls.posterUrl ? (
+                        <div className="relative w-full h-full">
+                          <img
+                            src={previewUrls.posterUrl}
+                            alt="Poster preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                            <Play className="h-12 w-12 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground/50">
+                          <Video className="h-12 w-12 mb-2" />
+                          <span className="text-xs">No video</span>
+                        </div>
+                      )}
+                      {/* Headline/Caption overlay */}
+                      {(videoDraftState.headline || videoDraftState.caption) && (
+                        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent">
+                          {videoDraftState.headline && (
+                            <p className="text-white text-sm font-semibold line-clamp-2">
+                              {videoDraftState.headline}
+                            </p>
+                          )}
+                          {videoDraftState.caption && (
+                            <p className="text-white/80 text-xs mt-1 line-clamp-2">
+                              {videoDraftState.caption}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Caption */}
-                {videoDraftState.caption && (
-                  <div className="p-4 bg-muted/50 rounded-lg">
+                {/* Author and Source */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-3 bg-muted/50 rounded-lg">
                     <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                      Caption
+                      Author
                     </div>
-                    <div className="text-card-foreground">
-                      {videoDraftState.caption}
+                    <div className="text-sm text-card-foreground">
+                      {videoDraftState.author_name || getAuthorName()}
                     </div>
+                  </div>
+                  {videoDraftState.media_source_name && (
+                    <div className="p-3 bg-muted/50 rounded-lg">
+                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
+                        Source
+                      </div>
+                      <div className="text-sm text-card-foreground">
+                        {videoDraftState.media_source_name}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Missing video warning */}
+                {!(window as any).__verticalVideoMediaFiles?.videoFile && (
+                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
+                    <p className="text-sm text-destructive">No video file found. Please go back and upload a video.</p>
                   </div>
                 )}
-
-                {/* Author */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Author
-                  </div>
-                  <div className="text-card-foreground">
-                    {videoDraftState.author_name || getAuthorName()}
-                  </div>
-                </div>
-
-                {/* Video File Status */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Video File
-                  </div>
-                  <div className="text-card-foreground">
-                    {(window as any).__verticalVideoMediaFiles?.videoFile ? (
-                      <span className="text-green-600 dark:text-green-400 flex items-center gap-2">
-                        <Video className="h-4 w-4" />
-                        Ready to upload
-                      </span>
-                    ) : (
-                      <span className="text-destructive">
-                        No video selected
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Poster Status */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Poster/Thumbnail
-                  </div>
-                  <div className="text-card-foreground">
-                    {(window as any).__verticalVideoMediaFiles?.posterFile ? (
-                      <span className="text-green-600 dark:text-green-400 flex items-center gap-2">
-                        <Check className="h-4 w-4" />
-                        Ready to upload
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        No poster selected (optional)
-                      </span>
-                    )}
-                  </div>
-                </div>
 
                 {/* Error Message */}
                 {errorMessage && (
@@ -481,96 +595,191 @@ export default function ResponsePage() {
               </div>
             )
           ) : (
-            // Brief Summary
+            // Brief Preview
             draftState ? (
-              <div className="space-y-6">
-                {/* Headline */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Headline
-                  </div>
-                  <div className="text-lg font-semibold text-card-foreground">
-                    {draftState.story_headline || '(No headline)'}
-                  </div>
-                </div>
-
-                {/* Author */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Author
-                  </div>
-                  <div className="text-card-foreground">
-                    {draftState.author_name || getAuthorName()}
-                  </div>
-                </div>
-
-                {/* Slides Count */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Content
-                  </div>
-                  <div className="flex items-center gap-2 text-card-foreground">
-                    <FileText className="h-4 w-4" />
-                    {draftState.slides.length} {draftState.slides.length === 1 ? 'slide' : 'slides'}
-                  </div>
-                </div>
-
-                {/* Headline Photo Status */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Cover Photo
-                  </div>
-                  <div className="text-card-foreground">
-                    {(window as any).__briefMediaFiles?.headlinePhoto ? (
-                      <span className="text-green-600 dark:text-green-400 flex items-center gap-2">
-                        <Check className="h-4 w-4" />
-                        Ready to upload
-                      </span>
+              <div className="space-y-8">
+                {/* Cover Media Hero */}
+                {previewUrls.coverUrl ? (
+                  <div className="relative rounded-lg overflow-hidden border border-border">
+                    {isCoverVideo() ? (
+                      <div className="relative">
+                        <video
+                          src={previewUrls.coverUrl}
+                          className="w-full h-64 object-cover"
+                          controls={false}
+                          muted
+                          preload="metadata"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <Video className="h-10 w-10 text-white" />
+                        </div>
+                      </div>
                     ) : (
-                      <span className="text-amber-600 dark:text-amber-400">
-                        No cover photo selected
-                      </span>
+                      <img
+                        src={previewUrls.coverUrl}
+                        alt="Cover"
+                        className="w-full h-64 object-cover"
+                      />
                     )}
+                    <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/70 to-transparent">
+                      <h3 className="text-xl font-bold text-white leading-tight">
+                        {draftState.story_headline || '(No headline)'}
+                      </h3>
+                      {(draftState as any).subhead && (
+                        <p className="text-white/80 text-sm mt-1">{(draftState as any).subhead}</p>
+                      )}
+                      <div className="flex items-center gap-2 mt-2 text-white/70 text-xs">
+                        <User className="h-3 w-3" />
+                        {draftState.author_name || getAuthorName()}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-6 bg-muted/50 rounded-lg border border-border">
+                    <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 text-xs mb-3">
+                      <ImageIcon className="h-4 w-4" />
+                      No cover photo selected
+                    </div>
+                    <h3 className="text-xl font-bold text-card-foreground leading-tight">
+                      {draftState.story_headline || '(No headline)'}
+                    </h3>
+                    {(draftState as any).subhead && (
+                      <p className="text-muted-foreground text-sm mt-1">{(draftState as any).subhead}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-2 text-muted-foreground text-xs">
+                      <User className="h-3 w-3" />
+                      {draftState.author_name || getAuthorName()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Slides */}
+                <div>
+                  <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-3">
+                    {draftState.slides.length} {draftState.slides.length === 1 ? 'Slide' : 'Slides'}
+                  </h4>
+                  <div className="space-y-4">
+                    {draftState.slides.map((slide) => {
+                      const mediaUrls = previewUrls.slideMediaUrls.get(slide.id)
+                      const hasMedia = mediaUrls && mediaUrls.length > 0
+                      const slideIsVideo = hasMedia && (isVideoFile(slide.id) || isVideoUrl(mediaUrls[0]))
+
+                      return (
+                        <div
+                          key={slide.id}
+                          className="rounded-lg border border-border overflow-hidden bg-muted/30"
+                        >
+                          {/* Slide media */}
+                          {hasMedia && (
+                            <div className="relative">
+                              {slideIsVideo ? (
+                                <>
+                                  <video
+                                    src={mediaUrls[0]}
+                                    className="w-full h-40 object-cover"
+                                    controls={false}
+                                    muted
+                                    preload="metadata"
+                                  />
+                                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                    <Play className="h-8 w-8 text-white" />
+                                  </div>
+                                </>
+                              ) : (
+                                <img
+                                  src={mediaUrls[0]}
+                                  alt={`Slide ${slide.slideIndex} media`}
+                                  className="w-full h-40 object-cover"
+                                />
+                              )}
+                              {slide.slide_media_source && (
+                                <div className="absolute bottom-1 right-1 px-2 py-0.5 bg-black/60 rounded text-[10px] text-white/80">
+                                  {slide.slide_media_source}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {/* Slide text content */}
+                          <div className="p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-full">
+                                Slide {slide.slideIndex}
+                              </span>
+                            </div>
+                            {slide.slide_headline_1 && (
+                              <h5 className="text-sm font-semibold text-card-foreground mb-1">
+                                {slide.slide_headline_1}
+                              </h5>
+                            )}
+                            {slide.slide_content_1 && (
+                              <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                                {slide.slide_content_1}
+                              </p>
+                            )}
+                            {slide.slide_quote && (
+                              <div className="mt-2 pl-3 border-l-2 border-primary/40 italic text-sm text-muted-foreground">
+                                &ldquo;{slide.slide_quote}&rdquo;
+                              </div>
+                            )}
+                            {!slide.slide_headline_1 && !slide.slide_content_1 && !slide.slide_quote && (
+                              <p className="text-sm text-muted-foreground/50 italic">
+                                (Empty slide)
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
 
-                {/* Quiz Status */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Quiz Slide
+                {/* Quiz */}
+                {draftState.quiz && draftState.quiz.quiz_content && (
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <div className="px-4 py-2 bg-primary/10 border-b border-border flex items-center gap-2">
+                      <HelpCircle className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-medium text-primary uppercase tracking-wider">Quiz</span>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-sm font-semibold text-card-foreground mb-3">
+                        {draftState.quiz.quiz_content}
+                      </p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {[
+                          { label: 'A', value: draftState.quiz.quiz_answer_a },
+                          { label: 'B', value: draftState.quiz.quiz_answer_b },
+                          { label: 'C', value: draftState.quiz.quiz_answer_c },
+                          { label: 'D', value: draftState.quiz.quiz_answer_d },
+                        ].filter(opt => opt.value).map(opt => (
+                          <div
+                            key={opt.label}
+                            className="p-2 rounded-md border border-border bg-background text-sm text-card-foreground flex items-center gap-2"
+                          >
+                            <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs font-medium text-muted-foreground flex-shrink-0">
+                              {opt.label}
+                            </span>
+                            {opt.value}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-card-foreground">
-                    {draftState.quiz && draftState.quiz.quiz_content ? (
-                      <span className="text-green-600 dark:text-green-400 flex items-center gap-2">
-                        <HelpCircle className="h-4 w-4" />
-                        Quiz included
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        No quiz (optional)
-                      </span>
-                    )}
-                  </div>
-                </div>
+                )}
 
-                {/* Poll Status */}
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                    Poll Slide
+                {/* Poll */}
+                {draftState.poll && draftState.poll.question && (
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <div className="px-4 py-2 bg-primary/10 border-b border-border flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                      <span className="text-xs font-medium text-primary uppercase tracking-wider">Poll</span>
+                    </div>
+                    <div className="p-4">
+                      <p className="text-sm font-semibold text-card-foreground">
+                        {draftState.poll.question}
+                      </p>
+                    </div>
                   </div>
-                  <div className="text-card-foreground">
-                    {draftState.poll && draftState.poll.question ? (
-                      <span className="text-green-600 dark:text-green-400 flex items-center gap-2">
-                        <BarChart3 className="h-4 w-4" />
-                        Poll included
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">
-                        No poll (optional)
-                      </span>
-                    )}
-                  </div>
-                </div>
+                )}
 
                 {/* Error Message */}
                 {errorMessage && (
