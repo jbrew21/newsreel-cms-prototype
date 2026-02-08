@@ -11,7 +11,7 @@ export default function LoginPage() {
       </div>
 
       {/* Centered Login Card */}
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-lg">
         <div className="bg-card border border-border rounded-lg p-8 shadow-xl">
           {/* Logo */}
           <div className="flex justify-center mb-8">
@@ -19,13 +19,10 @@ export default function LoginPage() {
           </div>
 
           {/* Header */}
-          <div className="text-center mb-8 space-y-2">
-            <h1 className="text-2xl font-bold text-foreground">
-              Welcome to NewsReel!
+          <div className="text-center mb-8">
+            <h1 className="text-3xl italic text-foreground" style={{ fontFamily: 'var(--font-playfair), serif' }}>
+              Welcome to Newsreel Contributors
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Log in to your NewsReel account
-            </p>
           </div>
 
           {/* Login Form */}

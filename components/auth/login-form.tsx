@@ -179,14 +179,6 @@ export function LoginForm() {
         {isLoading ? 'Sending OTP...' : 'Send OTP'}
       </Button>
 
-      <div className="text-center">
-        <a
-          href="#"
-          className="text-sm text-primary hover:underline font-medium"
-        >
-          Forgot your password?
-        </a>
-      </div>
     </form>
   )
 }
