@@ -68,9 +68,8 @@ export async function saveBriefPost(params: {
       story_date: storyDate,
       story_type: storyType,
       published_at: publishedAt,
-      // Default values for brief format
-      is_premium: false,
-      is_k12: true,
+      is_premium: draftState.is_premium ?? false,
+      is_k12: draftState.is_k12 ?? false,
       is_breaking: false,
     }
 
@@ -514,6 +513,8 @@ export async function getFullBriefStory(storyId: string): Promise<{
     author_name: authorName,
     story_type: story.story_type || null,
     story_date: story.story_date || null,
+    is_k12: story.is_k12 ?? false,
+    is_premium: story.is_premium ?? false,
     slides,
     quiz: quizFormData,
     poll: pollFormData,
@@ -567,6 +568,8 @@ export async function updateBriefPost(params: {
         subhead: draftState.subhead?.trim() || null,
         story_date: storyDate,
         story_type: storyType,
+        is_premium: draftState.is_premium ?? false,
+        is_k12: draftState.is_k12 ?? false,
         published_at: publishedAt,
         updated_at: new Date().toISOString(),
       })

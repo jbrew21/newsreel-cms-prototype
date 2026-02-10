@@ -114,6 +114,7 @@ export async function GET(
           cover_media_type: coverMedia?.media_assets?.media_type || null,
           slide_count: story.slides?.length || 0,
           is_premium: story.is_premium,
+          is_k12: story.is_k12,
           is_breaking: story.is_breaking,
           status: story.published_at ? 'published' : 'draft',
           created_at: story.created_at,

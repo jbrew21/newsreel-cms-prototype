@@ -294,6 +294,8 @@ export interface BriefFormData {
   author_name: string
   story_type?: string | null // Optional - defaults to 'brief'
   story_date?: string | null // Optional - defaults to published_at or updated_at
+  is_k12?: boolean
+  is_premium?: boolean
   slides: SlideFormData[]
   // Optional quiz and poll
   quiz?: QuizFormData | null

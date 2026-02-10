@@ -59,6 +59,8 @@ export default function CreateContentPage() {
     headlinePhoto: null,
     author_id: null,
     author_name: '',
+    is_k12: false,
+    is_premium: false,
     slides: [
       {
         id: crypto.randomUUID(),
@@ -199,6 +201,8 @@ export default function CreateContentPage() {
         author_name: parsed.author_name || prev.author_name,
         story_type: parsed.story_type || null,
         story_date: parsed.story_date || null,
+        is_k12: parsed.is_k12 ?? false,
+        is_premium: parsed.is_premium ?? false,
         slides: (parsed.slides || []).map((slide: any) => ({
           id: slide.id,
           slideIndex: slide.slideIndex,
@@ -413,6 +417,8 @@ export default function CreateContentPage() {
       headlinePhotoUrl: storyData.headlinePhotoUrl || null,
       author_id: storyData.author_id,
       author_name: storyData.author_name,
+      is_k12: storyData.is_k12 ?? false,
+      is_premium: storyData.is_premium ?? false,
       slides: storyData.slides.map(slide => ({
         id: slide.id,
         slideIndex: slide.slideIndex,
@@ -694,6 +700,30 @@ export default function CreateContentPage() {
                       Optional. Defaults to publish/draft date.
                     </p>
                   </div>
+                </div>
+
+                {/* Story Flags */}
+                <div className="flex items-center gap-6">
+                  <label htmlFor="is-k12" className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      id="is-k12"
+                      type="checkbox"
+                      checked={storyData.is_k12 ?? false}
+                      onChange={(e) => setStoryData(prev => ({ ...prev, is_k12: e.target.checked }))}
+                      className="h-4 w-4 rounded border-border accent-primary"
+                    />
+                    <span className="text-sm font-medium text-foreground">Sensitive Story (K-12)</span>
+                  </label>
+                  <label htmlFor="is-premium" className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      id="is-premium"
+                      type="checkbox"
+                      checked={storyData.is_premium ?? false}
+                      onChange={(e) => setStoryData(prev => ({ ...prev, is_premium: e.target.checked }))}
+                      className="h-4 w-4 rounded border-border accent-primary"
+                    />
+                    <span className="text-sm font-medium text-foreground">Premium</span>
+                  </label>
                 </div>
               </div>
             </Card>
