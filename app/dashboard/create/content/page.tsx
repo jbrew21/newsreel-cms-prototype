@@ -412,6 +412,7 @@ export default function CreateContentPage() {
     // Note: File objects can't be serialized, so they're stored in window.__briefMediaFiles
     const serializableState = {
       story_headline: storyData.story_headline,
+      subhead: storyData.subhead || null,
       headlinePhoto: null, // File stored in global
       headlinePhotoName: storyData.headlinePhoto?.name || null,
       headlinePhotoUrl: storyData.headlinePhotoUrl || null,
