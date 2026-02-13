@@ -31,6 +31,7 @@ interface StoryWithMedia {
   created_at: string | null
   slides: { id: string }[]
   coverUrl?: string
+  coverMediaType?: 'image' | 'video'
 }
 
 interface VideoFeedWithMedia {
@@ -120,7 +121,8 @@ export default function DashboardPage() {
               role,
               media_assets (
                 bucket,
-                object_path
+                object_path,
+                media_type
               )
             )
           `)
@@ -130,12 +132,14 @@ export default function DashboardPage() {
         if (storiesData) {
           const storiesWithUrls = storiesData.map((story: any) => {
             let coverUrl: string | undefined
+            let coverMediaType: 'image' | 'video' | undefined
             const coverMedia = story.story_media?.find((sm: any) => sm.role === 'cover')
             if (coverMedia?.media_assets) {
               const { data } = supabase.storage
                 .from(coverMedia.media_assets.bucket)
                 .getPublicUrl(coverMedia.media_assets.object_path)
               coverUrl = data.publicUrl
+              coverMediaType = coverMedia.media_assets.media_type || undefined
             }
             return {
               id: story.id,
@@ -144,6 +148,7 @@ export default function DashboardPage() {
               created_at: story.created_at,
               slides: story.slides || [],
               coverUrl,
+              coverMediaType,
             }
           })
           setStories(storiesWithUrls)
@@ -455,11 +460,25 @@ export default function DashboardPage() {
                   {/* Thumbnail */}
                   <div className="aspect-video bg-muted relative overflow-hidden">
                     {item.type === 'story' && item.data.coverUrl ? (
-                      <img
-                        src={item.data.coverUrl}
-                        alt={item.data.story_headline || 'Story cover'}
-                        className="w-full h-full object-cover"
-                      />
+                      item.data.coverMediaType === 'video' ? (
+                        <div className="relative w-full h-full">
+                          <video
+                            src={item.data.coverUrl}
+                            className="w-full h-full object-cover"
+                            muted
+                            preload="metadata"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                            <Video className="h-8 w-8 text-white" />
+                          </div>
+                        </div>
+                      ) : (
+                        <img
+                          src={item.data.coverUrl}
+                          alt={item.data.story_headline || 'Story cover'}
+                          className="w-full h-full object-cover"
+                        />
+                      )
                     ) : item.type === 'video' && item.data.posterUrl ? (
                       <img
                         src={item.data.posterUrl}
@@ -558,14 +577,23 @@ export default function DashboardPage() {
             <div className="overflow-y-auto max-h-[calc(90vh-140px)]">
               {selectedContent.type === 'story' ? (
                 <div>
-                  {/* Cover Image */}
+                  {/* Cover Media */}
                   {selectedContent.data.coverUrl && (
                     <div className="aspect-video bg-muted">
-                      <img
-                        src={selectedContent.data.coverUrl}
-                        alt="Story cover"
-                        className="w-full h-full object-cover"
-                      />
+                      {selectedContent.data.coverMediaType === 'video' ? (
+                        <video
+                          src={selectedContent.data.coverUrl}
+                          controls
+                          muted
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <img
+                          src={selectedContent.data.coverUrl}
+                          alt="Story cover"
+                          className="w-full h-full object-cover"
+                        />
+                      )}
                     </div>
                   )}
 
