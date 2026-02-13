@@ -49,6 +49,7 @@ export interface Story {
   access_code: string | null
   partner_name: string | null
   partner_article_link: string | null
+  story_media_source: string | null
   created_at: string | null
   updated_at: string | null
   published_at: string | null
@@ -172,6 +173,7 @@ export interface StoryInsert {
   access_code?: string | null
   partner_name?: string | null
   partner_article_link?: string | null
+  story_media_source?: string | null
   published_at?: string | null
 }
 
@@ -296,6 +298,7 @@ export interface BriefFormData {
   story_date?: string | null // Optional - defaults to published_at or updated_at
   is_k12?: boolean
   is_premium?: boolean
+  story_media_source?: string | null
   slides: SlideFormData[]
   // Optional quiz and poll
   quiz?: QuizFormData | null

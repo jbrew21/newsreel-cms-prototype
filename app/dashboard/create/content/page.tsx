@@ -88,6 +88,8 @@ export default function CreateContentPage() {
   const [slideMediaPreviews, setSlideMediaPreviews] = useState<Map<string, string[]>>(new Map())
   const [mediaPickerSlideId, setMediaPickerSlideId] = useState<string | null>(null)
   const [mediaSearchSlideId, setMediaSearchSlideId] = useState<string | null>(null)
+  const [coverPickerOpen, setCoverPickerOpen] = useState(false)
+  const [coverSearchOpen, setCoverSearchOpen] = useState(false)
 
   // Drag and drop state
   const [draggedSlideId, setDraggedSlideId] = useState<string | null>(null)
@@ -130,7 +132,7 @@ export default function CreateContentPage() {
         window.__briefMediaFiles.headlinePhoto = storyData.headlinePhoto
       }
       return () => URL.revokeObjectURL(url)
-    } else {
+    } else if (!storyData.headlinePhotoUrl) {
       setHeadlinePhotoPreview(null)
     }
   }, [storyData.headlinePhoto])
@@ -203,6 +205,7 @@ export default function CreateContentPage() {
         story_date: parsed.story_date || null,
         is_k12: parsed.is_k12 ?? false,
         is_premium: parsed.is_premium ?? false,
+        story_media_source: parsed.story_media_source || null,
         slides: (parsed.slides || []).map((slide: any) => ({
           id: slide.id,
           slideIndex: slide.slideIndex,
@@ -344,6 +347,20 @@ export default function CreateContentPage() {
     }
   }
 
+  const handleCoverSearchSelect = (item: MediaItem) => {
+    setStoryData(prev => ({
+      ...prev,
+      headlinePhotoUrl: item.url,
+      headlinePhoto: null,
+      story_media_source: item.attribution || item.source || prev.story_media_source,
+    }))
+    setHeadlinePhotoPreview(item.url)
+    if (window.__briefMediaFiles) {
+      window.__briefMediaFiles.headlinePhoto = null
+    }
+    setCoverSearchOpen(false)
+  }
+
   const isVideoFile = (file: File): boolean => {
     return file.type.startsWith('video/')
   }
@@ -420,6 +437,7 @@ export default function CreateContentPage() {
       author_name: storyData.author_name,
       is_k12: storyData.is_k12 ?? false,
       is_premium: storyData.is_premium ?? false,
+      story_media_source: storyData.story_media_source || null,
       slides: storyData.slides.map(slide => ({
         id: slide.id,
         slideIndex: slide.slideIndex,
@@ -582,32 +600,43 @@ export default function CreateContentPage() {
                     Cover Media<span className="text-primary ml-1">*</span>
                   </Label>
                   <div className="space-y-3">
+                    <MediaPickerModal
+                      open={coverPickerOpen}
+                      onOpenChange={setCoverPickerOpen}
+                      onUploadClick={() => document.getElementById('headline-photo-input')?.click()}
+                      onSearchClick={() => setCoverSearchOpen(true)}
+                    />
+                    <MediaSearchModal
+                      open={coverSearchOpen}
+                      onOpenChange={setCoverSearchOpen}
+                      onSelectMedia={handleCoverSearchSelect}
+                    />
                     <div className="flex items-center gap-3">
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => document.getElementById('headline-photo-input')?.click()}
+                        onClick={() => setCoverPickerOpen(true)}
                         className="bg-background"
                       >
-                        Choose File
+                        Choose Media
                       </Button>
                       <input
                         id="headline-photo-input"
                         type="file"
                         accept="image/*,video/*"
                         className="hidden"
-                        onChange={(e) => setStoryData(prev => ({ ...prev, headlinePhoto: e.target.files?.[0] || null }))}
+                        onChange={(e) => setStoryData(prev => ({ ...prev, headlinePhoto: e.target.files?.[0] || null, headlinePhotoUrl: undefined }))}
                       />
                       <span className="text-sm text-muted-foreground">
                         {storyData.headlinePhoto
                           ? storyData.headlinePhoto.name
-                          : (isEditMode && storyData.headlinePhotoUrl)
+                          : storyData.headlinePhotoUrl
                             ? 'Current cover media'
                             : 'No file chosen'}
                       </span>
                     </div>
                     {/* Headline Photo/Video Preview - new file or existing URL */}
-                    {(headlinePhotoPreview || (isEditMode && storyData.headlinePhotoUrl && !storyData.headlinePhoto)) && (
+                    {(headlinePhotoPreview || (storyData.headlinePhotoUrl && !storyData.headlinePhoto)) && (
                       <div className="relative w-full max-w-xs">
                         {/* Check if it's a video - either from File type or URL pattern */}
                         {(storyData.headlinePhoto?.type.startsWith('video/') ||
@@ -632,11 +661,12 @@ export default function CreateContentPage() {
                             className="w-full h-40 object-cover rounded-lg border border-border"
                           />
                         )}
-                        {headlinePhotoPreview && (
+                        {(headlinePhotoPreview || storyData.headlinePhotoUrl) && (
                           <button
                             type="button"
                             onClick={() => {
-                              setStoryData(prev => ({ ...prev, headlinePhoto: null }))
+                              setStoryData(prev => ({ ...prev, headlinePhoto: null, headlinePhotoUrl: undefined }))
+                              setHeadlinePhotoPreview(null)
                               if (window.__briefMediaFiles) {
                                 window.__briefMediaFiles.headlinePhoto = null
                               }
@@ -650,6 +680,20 @@ export default function CreateContentPage() {
                       </div>
                     )}
                   </div>
+                </div>
+
+                {/* Cover Media Source */}
+                <div className="space-y-2">
+                  <Label htmlFor="story-media-source" className="text-foreground">
+                    Media Source <span className="text-muted-foreground font-normal">(optional)</span>
+                  </Label>
+                  <Input
+                    id="story-media-source"
+                    value={storyData.story_media_source || ''}
+                    onChange={(e) => setStoryData(prev => ({ ...prev, story_media_source: e.target.value || null }))}
+                    placeholder="e.g., Reuters, AP, Getty Images"
+                    className="bg-background"
+                  />
                 </div>
 
                 {/* Author Name */}
