@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { LogOut, Plus, FileText, Video, Eye, Calendar, X, ExternalLink } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { LogOut, Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users } from 'lucide-react'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
@@ -32,6 +33,7 @@ interface StoryWithMedia {
   slides: { id: string }[]
   coverUrl?: string
   coverMediaType?: 'image' | 'video'
+  authorName?: string
 }
 
 interface VideoFeedWithMedia {
@@ -56,6 +58,11 @@ export default function DashboardPage() {
   const [stories, setStories] = useState<StoryWithMedia[]>([])
   const [videoFeeds, setVideoFeeds] = useState<VideoFeedWithMedia[]>([])
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null)
+  const [isInternalTeam, setIsInternalTeam] = useState(false)
+  const [activeTab, setActiveTab] = useState<'my' | 'all'>('my')
+  const [allStories, setAllStories] = useState<StoryWithMedia[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [allStoriesLoading, setAllStoriesLoading] = useState(false)
 
   useEffect(() => {
     checkUser()
@@ -85,8 +92,18 @@ export default function DashboardPage() {
             return
           }
           setAuthor(authorData)
+
+          // Detect internal team
+          const internal = user.email?.endsWith('@newsreel.co') ?? false
+          setIsInternalTeam(internal)
+
           // Fetch content for this author
           await fetchAuthorContent(authorData.id)
+
+          // If internal team, also fetch all stories
+          if (internal) {
+            await fetchAllStories()
+          }
         }
       }
     } catch (error) {
@@ -214,6 +231,75 @@ export default function DashboardPage() {
     }
   }
 
+  const fetchAllStories = async () => {
+    try {
+      setAllStoriesLoading(true)
+
+      const { data: storiesData } = await supabase
+        .from('stories')
+        .select(`
+          id,
+          story_headline,
+          published_at,
+          created_at,
+          slides (id),
+          story_media (
+            media_id,
+            role,
+            media_assets (
+              bucket,
+              object_path,
+              media_type
+            )
+          ),
+          authors_stories_links (
+            authors (
+              author_first_name,
+              author_last_name
+            )
+          )
+        `)
+        .order('created_at', { ascending: false })
+
+      if (storiesData) {
+        const storiesWithUrls = storiesData.map((story: any) => {
+          let coverUrl: string | undefined
+          let coverMediaType: 'image' | 'video' | undefined
+          const coverMedia = story.story_media?.find((sm: any) => sm.role === 'cover')
+          if (coverMedia?.media_assets) {
+            const { data } = supabase.storage
+              .from(coverMedia.media_assets.bucket)
+              .getPublicUrl(coverMedia.media_assets.object_path)
+            coverUrl = data.publicUrl
+            coverMediaType = coverMedia.media_assets.media_type || undefined
+          }
+
+          // Get author name from the junction table
+          const authorLink = story.authors_stories_links?.[0]?.authors
+          const authorName = authorLink
+            ? `${authorLink.author_first_name || ''} ${authorLink.author_last_name || ''}`.trim()
+            : 'Unknown Author'
+
+          return {
+            id: story.id,
+            story_headline: story.story_headline,
+            published_at: story.published_at,
+            created_at: story.created_at,
+            slides: story.slides || [],
+            coverUrl,
+            coverMediaType,
+            authorName,
+          }
+        })
+        setAllStories(storiesWithUrls)
+      }
+    } catch (error) {
+      console.error('Error fetching all stories:', error)
+    } finally {
+      setAllStoriesLoading(false)
+    }
+  }
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut()
@@ -256,6 +342,17 @@ export default function DashboardPage() {
     return name[0]?.toUpperCase() || 'A'
   }
 
+  // Filtered "All Stories" for internal team with search
+  const filteredAllStories = useMemo(() => {
+    if (!isInternalTeam) return []
+    const q = searchQuery.toLowerCase().trim()
+    if (!q) return allStories
+    return allStories.filter(s =>
+      (s.story_headline || '').toLowerCase().includes(q) ||
+      (s.authorName || '').toLowerCase().includes(q)
+    )
+  }, [allStories, searchQuery, isInternalTeam])
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -289,6 +386,20 @@ export default function DashboardPage() {
             <Logo width={64} height={64} />
           </div>
           <div className="flex items-center gap-2">
+            {isInternalTeam && (
+              <div className="relative hidden sm:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search stories, authors..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    if (e.target.value && activeTab !== 'all') setActiveTab('all')
+                  }}
+                  className="pl-9 w-[260px]"
+                />
+              </div>
+            )}
             <Button
               variant="default"
               onClick={() => router.push('/dashboard/create')}
@@ -420,124 +531,274 @@ export default function DashboardPage() {
           </Card>
         </div>
 
-        {/* Your Content Section */}
+        {/* Mobile search bar for internal team */}
+        {isInternalTeam && (
+          <div className="sm:hidden mb-6">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search stories, authors..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value)
+                  if (e.target.value && activeTab !== 'all') setActiveTab('all')
+                }}
+                className="pl-9"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Content Section */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-xl font-semibold text-foreground">
-              Your Content
-            </h2>
-            {allContent.length > 0 && (
+            {isInternalTeam ? (
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                <button
+                  onClick={() => { setActiveTab('my'); setSearchQuery('') }}
+                  className={cn(
+                    "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                    activeTab === 'my'
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  My Content
+                </button>
+                <button
+                  onClick={() => setActiveTab('all')}
+                  className={cn(
+                    "px-4 py-2 text-sm font-medium rounded-md transition-colors flex items-center gap-2",
+                    activeTab === 'all'
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  All Stories
+                </button>
+              </div>
+            ) : (
+              <h2 className="text-xl font-semibold text-foreground">
+                Your Content
+              </h2>
+            )}
+            {activeTab === 'my' && allContent.length > 0 && (
               <span className="text-sm text-muted-foreground">
                 {allContent.length} {allContent.length === 1 ? 'item' : 'items'}
               </span>
             )}
+            {activeTab === 'all' && isInternalTeam && (
+              <span className="text-sm text-muted-foreground">
+                {filteredAllStories.length} {filteredAllStories.length === 1 ? 'story' : 'stories'}
+              </span>
+            )}
           </div>
 
-          {allContent.length === 0 ? (
-            <Card className="p-12 text-center">
-              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
-                <FileText className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-lg font-semibold text-card-foreground mb-2">
-                No content yet
-              </h3>
-              <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                Start creating your first story or video to see it here. Your published content will appear on the Newsreel app.
-              </p>
-              <Button onClick={() => router.push('/dashboard/create')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Create your first story
-              </Button>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {allContent.map((item) => (
-                <Card
-                  key={item.type === 'story' ? `story-${item.data.id}` : `video-${item.data.id}`}
-                  className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-                  onClick={() => setSelectedContent(item)}
-                >
-                  {/* Thumbnail */}
-                  <div className="aspect-video bg-muted relative overflow-hidden">
-                    {item.type === 'story' && item.data.coverUrl ? (
-                      item.data.coverMediaType === 'video' ? (
-                        <div className="relative w-full h-full">
-                          <video
-                            src={item.data.coverUrl}
-                            className="w-full h-full object-cover"
-                            muted
-                            preload="metadata"
-                          />
-                          <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                            <Video className="h-8 w-8 text-white" />
-                          </div>
-                        </div>
-                      ) : (
-                        <img
-                          src={item.data.coverUrl}
-                          alt={item.data.story_headline || 'Story cover'}
-                          className="w-full h-full object-cover"
-                        />
-                      )
-                    ) : item.type === 'video' && item.data.posterUrl ? (
-                      <img
-                        src={item.data.posterUrl}
-                        alt={item.data.headline || 'Video poster'}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        {item.type === 'story' ? (
-                          <FileText className="h-12 w-12 text-muted-foreground/50" />
-                        ) : (
-                          <Video className="h-12 w-12 text-muted-foreground/50" />
-                        )}
-                      </div>
-                    )}
-
-                    {/* Type badge */}
-                    <div className={cn(
-                      "absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium",
-                      item.type === 'story'
-                        ? "bg-blue-500/90 text-white"
-                        : "bg-purple-500/90 text-white"
-                    )}>
-                      {item.type === 'story' ? 'Brief' : 'Video'}
-                    </div>
-
-                    {/* Status badge */}
-                    <div className={cn(
-                      "absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium",
-                      item.data.published_at
-                        ? "bg-green-500/90 text-white"
-                        : "bg-amber-500/90 text-white"
-                    )}>
-                      {item.data.published_at ? 'Published' : 'Draft'}
-                    </div>
+          {/* My Content tab */}
+          {activeTab === 'my' && (
+            <>
+              {allContent.length === 0 ? (
+                <Card className="p-12 text-center">
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FileText className="h-8 w-8 text-muted-foreground" />
                   </div>
-
-                  {/* Content info */}
-                  <div className="p-4">
-                    <h3 className="font-semibold text-card-foreground line-clamp-2 mb-2">
-                      {item.type === 'story'
-                        ? item.data.story_headline || 'Untitled Story'
-                        : item.data.headline || 'Untitled Video'
-                      }
-                    </h3>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Calendar className="h-3 w-3" />
-                      {formatDate(item.data.published_at || item.data.created_at)}
-                      {item.type === 'story' && item.data.slides && (
-                        <>
-                          <span className="text-muted-foreground/50">•</span>
-                          <span>{item.data.slides.length} slides</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
+                  <h3 className="text-lg font-semibold text-card-foreground mb-2">
+                    No content yet
+                  </h3>
+                  <p className="text-muted-foreground mb-6 max-w-md mx-auto">
+                    Start creating your first story or video to see it here. Your published content will appear on the Newsreel app.
+                  </p>
+                  <Button onClick={() => router.push('/dashboard/create')}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create your first story
+                  </Button>
                 </Card>
-              ))}
-            </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {allContent.map((item) => (
+                    <Card
+                      key={item.type === 'story' ? `story-${item.data.id}` : `video-${item.data.id}`}
+                      className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                      onClick={() => setSelectedContent(item)}
+                    >
+                      {/* Thumbnail */}
+                      <div className="aspect-video bg-muted relative overflow-hidden">
+                        {item.type === 'story' && item.data.coverUrl ? (
+                          item.data.coverMediaType === 'video' ? (
+                            <div className="relative w-full h-full">
+                              <video
+                                src={item.data.coverUrl}
+                                className="w-full h-full object-cover"
+                                muted
+                                preload="metadata"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                <Video className="h-8 w-8 text-white" />
+                              </div>
+                            </div>
+                          ) : (
+                            <img
+                              src={item.data.coverUrl}
+                              alt={item.data.story_headline || 'Story cover'}
+                              className="w-full h-full object-cover"
+                            />
+                          )
+                        ) : item.type === 'video' && item.data.posterUrl ? (
+                          <img
+                            src={item.data.posterUrl}
+                            alt={item.data.headline || 'Video poster'}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            {item.type === 'story' ? (
+                              <FileText className="h-12 w-12 text-muted-foreground/50" />
+                            ) : (
+                              <Video className="h-12 w-12 text-muted-foreground/50" />
+                            )}
+                          </div>
+                        )}
+
+                        {/* Type badge */}
+                        <div className={cn(
+                          "absolute top-2 left-2 px-2 py-1 rounded text-xs font-medium",
+                          item.type === 'story'
+                            ? "bg-blue-500/90 text-white"
+                            : "bg-purple-500/90 text-white"
+                        )}>
+                          {item.type === 'story' ? 'Brief' : 'Video'}
+                        </div>
+
+                        {/* Status badge */}
+                        <div className={cn(
+                          "absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium",
+                          item.data.published_at
+                            ? "bg-green-500/90 text-white"
+                            : "bg-amber-500/90 text-white"
+                        )}>
+                          {item.data.published_at ? 'Published' : 'Draft'}
+                        </div>
+                      </div>
+
+                      {/* Content info */}
+                      <div className="p-4">
+                        <h3 className="font-semibold text-card-foreground line-clamp-2 mb-2">
+                          {item.type === 'story'
+                            ? item.data.story_headline || 'Untitled Story'
+                            : item.data.headline || 'Untitled Video'
+                          }
+                        </h3>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(item.data.published_at || item.data.created_at)}
+                          {item.type === 'story' && item.data.slides && (
+                            <>
+                              <span className="text-muted-foreground/50">•</span>
+                              <span>{item.data.slides.length} slides</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {/* All Stories tab (internal team only) */}
+          {activeTab === 'all' && isInternalTeam && (
+            <>
+              {allStoriesLoading ? (
+                <div className="text-center py-12 text-muted-foreground">Loading all stories...</div>
+              ) : filteredAllStories.length === 0 ? (
+                <Card className="p-12 text-center">
+                  <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Search className="h-8 w-8 text-muted-foreground" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-card-foreground mb-2">
+                    {searchQuery ? 'No stories found' : 'No stories yet'}
+                  </h3>
+                  <p className="text-muted-foreground max-w-md mx-auto">
+                    {searchQuery
+                      ? `No stories matching "${searchQuery}". Try a different search.`
+                      : 'Stories from all authors will appear here.'
+                    }
+                  </p>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredAllStories.map((story) => (
+                    <Card
+                      key={`all-${story.id}`}
+                      className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
+                      onClick={() => setSelectedContent({ type: 'story', data: story })}
+                    >
+                      {/* Thumbnail */}
+                      <div className="aspect-video bg-muted relative overflow-hidden">
+                        {story.coverUrl ? (
+                          story.coverMediaType === 'video' ? (
+                            <div className="relative w-full h-full">
+                              <video
+                                src={story.coverUrl}
+                                className="w-full h-full object-cover"
+                                muted
+                                preload="metadata"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                <Video className="h-8 w-8 text-white" />
+                              </div>
+                            </div>
+                          ) : (
+                            <img
+                              src={story.coverUrl}
+                              alt={story.story_headline || 'Story cover'}
+                              className="w-full h-full object-cover"
+                            />
+                          )
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center">
+                            <FileText className="h-12 w-12 text-muted-foreground/50" />
+                          </div>
+                        )}
+
+                        {/* Status badge */}
+                        <div className={cn(
+                          "absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium",
+                          story.published_at
+                            ? "bg-green-500/90 text-white"
+                            : "bg-amber-500/90 text-white"
+                        )}>
+                          {story.published_at ? 'Published' : 'Draft'}
+                        </div>
+                      </div>
+
+                      {/* Content info */}
+                      <div className="p-4">
+                        <h3 className="font-semibold text-card-foreground line-clamp-2 mb-2">
+                          {story.story_headline || 'Untitled Story'}
+                        </h3>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
+                          <Users className="h-3 w-3" />
+                          <span>{story.authorName}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <Calendar className="h-3 w-3" />
+                          {formatDate(story.published_at || story.created_at)}
+                          {story.slides && (
+                            <>
+                              <span className="text-muted-foreground/50">•</span>
+                              <span>{story.slides.length} slides</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
@@ -602,7 +863,13 @@ export default function DashboardPage() {
                       {selectedContent.data.story_headline || 'Untitled Story'}
                     </h2>
 
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground mb-6">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-6">
+                      {selectedContent.data.authorName && (
+                        <div className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          {selectedContent.data.authorName}
+                        </div>
+                      )}
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
                         {formatDate(selectedContent.data.published_at || selectedContent.data.created_at)}
@@ -619,15 +886,6 @@ export default function DashboardPage() {
                       )}>
                         {selectedContent.data.published_at ? 'Published' : 'Draft'}
                       </div>
-                    </div>
-
-                    <div className="p-4 bg-muted/50 rounded-lg">
-                      <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1">
-                        Story ID
-                      </div>
-                      <code className="text-sm text-card-foreground font-mono">
-                        {selectedContent.data.id}
-                      </code>
                     </div>
                   </div>
                 </div>
