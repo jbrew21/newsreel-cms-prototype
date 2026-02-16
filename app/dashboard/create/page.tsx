@@ -69,6 +69,9 @@ export default function CreateStoryPage() {
 
   const handleContinue = () => {
     if (selectedFormat) {
+      // Clear any previous AI-generated or stale draft state for a fresh canvas
+      sessionStorage.removeItem('briefDraftState')
+      sessionStorage.removeItem('aiGenerated')
       // Navigate to Content step
       router.push(`/dashboard/create/content?format=${selectedFormat}`)
     }

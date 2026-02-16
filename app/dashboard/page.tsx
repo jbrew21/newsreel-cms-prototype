@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { LogOut, Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users } from 'lucide-react'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
+import { AIStoryGenerator } from '@/components/ai-story-generator'
 import { cn } from '@/lib/utils'
 
 interface Author {
@@ -434,6 +435,14 @@ export default function DashboardPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
+        {/* AI Story Generator */}
+        <div className="mb-8">
+          <AIStoryGenerator
+            authorId={author?.id || null}
+            authorName={getAuthorName()}
+          />
+        </div>
+
         {/* Author Info and Overall Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {/* Author Profile Card */}
