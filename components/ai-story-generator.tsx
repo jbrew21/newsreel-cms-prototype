@@ -6,7 +6,8 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
-import { Sparkles, Send, Minus, Plus } from 'lucide-react'
+import { Send, Minus, Plus } from 'lucide-react'
+import Image from 'next/image'
 import dynamic from 'next/dynamic'
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false })
@@ -163,8 +164,8 @@ export function AIStoryGenerator({ authorId, authorName }: AIStoryGeneratorProps
     )}>
       {/* Header */}
       <div className="px-5 pt-5 pb-3 flex items-center gap-2.5">
-        <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-          <Sparkles className="h-4 w-4 text-primary" />
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0">
+          <Image src="/logo/newsreel-icon.png" alt="Newsreel" width={32} height={32} />
         </div>
         <div>
           <h3 className="text-sm font-semibold text-card-foreground">AI Story Generator</h3>

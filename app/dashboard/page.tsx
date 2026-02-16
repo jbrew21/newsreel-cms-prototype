@@ -421,17 +421,6 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      {/* Early Access Banner */}
-      <div className="bg-muted border-b border-border">
-        <div className="container mx-auto px-4 py-3">
-          <div className="text-sm">
-            <span className="text-primary font-semibold">EARLY ACCESS</span>
-            <p className="text-muted-foreground mt-1">
-              This is the working version of Newsreel&apos;s posting system. Expect rough edges. Your feedback shapes what stays.
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
