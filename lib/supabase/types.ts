@@ -268,8 +268,10 @@ export interface SlideFormData {
   slide_media_source?: string
   portrait_video: boolean
   mediaFiles: File[]
-  // After save, we store the public URLs
+  // New external URLs from media search (Pexels, Unsplash, etc.) to be downloaded on save
   savedMediaUrls?: string[]
+  // Existing bucket URLs loaded from DB during edit (display-only, never re-downloaded)
+  existingMediaUrls?: string[]
 }
 
 export interface QuizFormData {
@@ -333,6 +335,7 @@ export interface SaveBriefResult {
   storyId: string
   success: boolean
   error?: string
+  mediaWarnings?: string[]
 }
 
 export interface SaveVerticalVideoParams {

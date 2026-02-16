@@ -39,6 +39,7 @@ export default function ResponsePage() {
   const [savedStoryId, setSavedStoryId] = useState<string | null>(null)
   const [savedVideoUrl, setSavedVideoUrl] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [mediaWarnings, setMediaWarnings] = useState<string[]>([])
   const [previewUrls, setPreviewUrls] = useState<{
     coverUrl: string | null
     slideMediaUrls: Map<string, string[]>
@@ -139,6 +140,8 @@ export default function ResponsePage() {
           slideMediaUrls.set(slide.id, slideUrls)
         } else if (slide.savedMediaUrls && slide.savedMediaUrls.length > 0) {
           slideMediaUrls.set(slide.id, slide.savedMediaUrls)
+        } else if (slide.existingMediaUrls && slide.existingMediaUrls.length > 0) {
+          slideMediaUrls.set(slide.id, slide.existingMediaUrls)
         }
       }
 
@@ -310,6 +313,9 @@ export default function ResponsePage() {
       if (result.success) {
         setSaveStatus('success')
         setSavedStoryId(result.storyId)
+        if (result.mediaWarnings?.length) {
+          setMediaWarnings(result.mediaWarnings)
+        }
         sessionStorage.removeItem('briefDraftState')
         sessionStorage.removeItem('briefEditMetadata')
         delete (window as any).__briefMediaFiles
@@ -374,6 +380,18 @@ export default function ResponsePage() {
                   ? 'Your story has been updated successfully.'
                   : 'Your story has been saved and is ready for review.'}
             </p>
+            {mediaWarnings.length > 0 && (
+              <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-left">
+                <div className="text-xs font-medium text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">
+                  Media Warnings
+                </div>
+                <ul className="space-y-1">
+                  {mediaWarnings.map((w, i) => (
+                    <li key={i} className="text-sm text-amber-700 dark:text-amber-300">{w}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             {savedVideoUrl && (
               <div className="mb-6 p-4 bg-muted/50 rounded-lg text-left">
                 <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">

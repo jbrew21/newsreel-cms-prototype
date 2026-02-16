@@ -53,6 +53,8 @@ export async function saveBriefPost(params: {
   const { mode, draftState, userId } = params
   const publishedAt = mode === 'publish' ? new Date().toISOString() : null
 
+  const mediaWarnings: string[] = []
+
   try {
     // ========================================
     // Step 1: Create Story Record
@@ -112,6 +114,31 @@ export async function saveBriefPost(params: {
         role: 'cover',
         sort_order: 0,
       })
+    } else if (draftState.headlinePhotoUrl) {
+      // Handle external URL from media search (Pexels, Unsplash, etc.)
+      const externalUrl = draftState.headlinePhotoUrl
+      const ext = getExtensionFromUrl(externalUrl)
+      const tempMediaId = crypto.randomUUID()
+      const objectPath = buildObjectPathForStoryCover(storyId, tempMediaId, ext)
+
+      try {
+        const { mediaId } = await uploadExternalMediaAndCreateAsset({
+          externalUrl,
+          bucket: STORAGE_BUCKET,
+          objectPath,
+          createdBy: userId,
+        })
+
+        await insertStoryMedia({
+          story_id: storyId,
+          media_id: mediaId,
+          role: 'cover',
+          sort_order: 0,
+        })
+      } catch (error) {
+        console.error('Failed to download/upload cover from external URL:', error)
+        mediaWarnings.push('Cover image failed to upload from search source')
+      }
     }
 
     // ========================================
@@ -217,7 +244,7 @@ export async function saveBriefPost(params: {
             })
           } catch (error) {
             console.error(`Failed to download/upload external media for slide ${i + 1}:`, error)
-            // Continue with other slides even if one media fails
+            mediaWarnings.push(`Slide ${i + 1}: Failed to upload media from search source`)
           }
         }
       }
@@ -292,6 +319,7 @@ export async function saveBriefPost(params: {
     return {
       storyId,
       success: true,
+      mediaWarnings: mediaWarnings.length > 0 ? mediaWarnings : undefined,
     }
   } catch (error) {
     console.error('Error saving brief:', error)
@@ -464,7 +492,8 @@ export async function getFullBriefStory(storyId: string): Promise<{
       slide_media_source: slide.slide_media_source || '',
       portrait_video: slide.portrait_video || false,
       mediaFiles: [] as File[], // No File objects for existing media
-      savedMediaUrls: mediaUrls,
+      savedMediaUrls: [] as string[], // Empty — only populated when user picks NEW search media
+      existingMediaUrls: mediaUrls, // Bucket URLs for display only, never re-downloaded
     }
   })
 
@@ -553,6 +582,7 @@ export async function updateBriefPost(params: {
   const { mode, draftState, userId, editMetadata } = params
   const { storyId, existingSlideIds, existingQuizId, existingPollId } = editMetadata
   const publishedAt = mode === 'publish' ? new Date().toISOString() : null
+  const mediaWarnings: string[] = []
 
   try {
     // ========================================
@@ -623,8 +653,51 @@ export async function updateBriefPost(params: {
         role: 'cover',
         sort_order: 0,
       })
+    } else if (draftState.headlinePhotoUrl && draftState.headlinePhotoUrl !== editMetadata.existingCoverUrl) {
+      // New cover from media search (different from existing) - delete old one first
+      const { data: oldCoverLinks } = await supabase
+        .from('story_media')
+        .select('media_id, media_assets ( id, bucket, object_path )')
+        .eq('story_id', storyId)
+        .eq('role', 'cover')
+
+      if (oldCoverLinks && oldCoverLinks.length > 0) {
+        for (const link of oldCoverLinks) {
+          const asset = (link as any).media_assets
+          if (asset) {
+            await supabase.storage.from(asset.bucket).remove([asset.object_path])
+            await supabase.from('story_media').delete().eq('story_id', storyId).eq('media_id', link.media_id)
+            await supabase.from('media_assets').delete().eq('id', asset.id)
+          }
+        }
+      }
+
+      // Download and upload external cover
+      const externalUrl = draftState.headlinePhotoUrl
+      const ext = getExtensionFromUrl(externalUrl)
+      const tempMediaId = crypto.randomUUID()
+      const objectPath = buildObjectPathForStoryCover(storyId, tempMediaId, ext)
+
+      try {
+        const { mediaId } = await uploadExternalMediaAndCreateAsset({
+          externalUrl,
+          bucket: STORAGE_BUCKET,
+          objectPath,
+          createdBy: userId,
+        })
+
+        await insertStoryMedia({
+          story_id: storyId,
+          media_id: mediaId,
+          role: 'cover',
+          sort_order: 0,
+        })
+      } catch (error) {
+        console.error('Failed to download/upload cover from external URL:', error)
+        mediaWarnings.push('Cover image failed to upload from search source')
+      }
     }
-    // If no new headlinePhoto, existing cover is kept as-is
+    // If no new headlinePhoto or headlinePhotoUrl, existing cover is kept as-is
 
     // ========================================
     // Step 3: Handle Slides
@@ -765,6 +838,7 @@ export async function updateBriefPost(params: {
               })
             } catch (error) {
               console.error(`Failed to download/upload external media for existing slide:`, error)
+              mediaWarnings.push(`Slide ${i + 1}: Failed to upload media from search source`)
             }
           }
         }
@@ -844,6 +918,7 @@ export async function updateBriefPost(params: {
               })
             } catch (error) {
               console.error(`Failed to download/upload external media for new slide:`, error)
+              mediaWarnings.push(`Slide ${i + 1}: Failed to upload media from search source`)
             }
           }
         }
@@ -921,6 +996,7 @@ export async function updateBriefPost(params: {
     return {
       storyId,
       success: true,
+      mediaWarnings: mediaWarnings.length > 0 ? mediaWarnings : undefined,
     }
   } catch (error) {
     console.error('Error updating brief:', error)

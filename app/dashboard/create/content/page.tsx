@@ -210,6 +210,7 @@ export default function CreateContentPage() {
           portrait_video: slide.portrait_video || false,
           mediaFiles: window.__briefMediaFiles?.slideMedia?.get(slide.id) || [],
           savedMediaUrls: slide.savedMediaUrls || [],
+          existingMediaUrls: slide.existingMediaUrls || [],
         })),
         quiz: parsed.quiz || null,
         poll: parsed.poll || null,
@@ -231,6 +232,8 @@ export default function CreateContentPage() {
           newPreviews.set(slide.id, files.map((f: File) => URL.createObjectURL(f)))
         } else if (slide.savedMediaUrls && slide.savedMediaUrls.length > 0) {
           newPreviews.set(slide.id, slide.savedMediaUrls)
+        } else if (slide.existingMediaUrls && slide.existingMediaUrls.length > 0) {
+          newPreviews.set(slide.id, slide.existingMediaUrls)
         }
       }
       if (newPreviews.size > 0) {
@@ -310,16 +313,19 @@ export default function CreateContentPage() {
         window.__briefMediaFiles.slideMedia.set(slideId, fileArray)
       }
 
-      // Update form state
+      // Update form state — clear existing/saved URLs since user is uploading new files
       handleSlideChange(slideId, 'mediaFiles', fileArray)
+      handleSlideChange(slideId, 'savedMediaUrls', [])
+      handleSlideChange(slideId, 'existingMediaUrls', [])
     }
   }
 
   const handleSearchMediaSelect = (slideId: string, item: MediaItem) => {
     // Store the selected URL as a saved media URL on the slide
     handleSlideChange(slideId, 'savedMediaUrls', [item.url])
-    // Clear any previously uploaded files for this slide
+    // Clear any previously uploaded files and existing media for this slide
     handleSlideChange(slideId, 'mediaFiles', [])
+    handleSlideChange(slideId, 'existingMediaUrls', [])
     // Revoke old preview URLs
     const oldUrls = slideMediaPreviews.get(slideId)
     if (oldUrls) {
@@ -443,6 +449,7 @@ export default function CreateContentPage() {
         mediaFiles: [], // Files stored in global
         mediaFileNames: slide.mediaFiles.map(f => f.name),
         savedMediaUrls: slide.savedMediaUrls || [],
+        existingMediaUrls: slide.existingMediaUrls || [],
       })),
       // Include quiz and poll (optional, can be null)
       quiz: storyData.quiz,
@@ -907,11 +914,13 @@ export default function CreateContentPage() {
                                     ? `${slide.mediaFiles.length} file${slide.mediaFiles.length > 1 ? 's' : ''} chosen`
                                     : (slide.savedMediaUrls && slide.savedMediaUrls.length > 0)
                                       ? 'Current media'
-                                      : 'No file chosen'}
+                                      : (slide.existingMediaUrls && slide.existingMediaUrls.length > 0)
+                                        ? 'Current media'
+                                        : 'No file chosen'}
                                 </span>
                               </div>
-                              {/* Existing Media Preview (edit mode) */}
-                              {!slideMediaPreviews.get(slide.id) && slide.savedMediaUrls?.map((url, idx) => {
+                              {/* Existing Media Preview (edit mode or search selection) */}
+                              {!slideMediaPreviews.get(slide.id) && (slide.savedMediaUrls?.length ? slide.savedMediaUrls : slide.existingMediaUrls)?.map((url, idx) => {
                                 const isVideoUrl = url.includes('/video/') || /\.(mp4|mov|webm|avi)(\?|$)/i.test(url)
                                 return (
                                   <div key={`saved-${idx}`} className="relative w-full max-w-xs">
