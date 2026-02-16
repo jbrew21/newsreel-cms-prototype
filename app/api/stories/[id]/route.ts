@@ -176,6 +176,7 @@ export async function GET(
       access_code: story.access_code || null,
       partner_name: story.partner_name || null,
       partner_article_link: story.partner_article_link || null,
+      story_media_source: story.story_media_source || null,
       cover: {
         url: coverUrl,
         media_type: coverAsset?.media_type || null,
