@@ -5,6 +5,10 @@ export type MediaSource =
   | 'pixabay'
   | 'coverr'
   | 'youtube'
+  | 'giphy'
+  | 'flickr'
+  | 'newsapi'
+  | 'gnews'
 
 export type MediaType = 'image' | 'video'
 
@@ -26,7 +30,11 @@ export const SOURCE_LABELS: Record<MediaSource, string> = {
   pixabay: 'Pixabay',
   coverr: 'Coverr',
   youtube: 'YouTube',
+  giphy: 'Giphy',
+  flickr: 'Flickr',
+  newsapi: 'NewsAPI',
+  gnews: 'GNews',
 }
 
-export const IMAGE_SOURCES: MediaSource[] = ['shutterstock', 'unsplash', 'pexels', 'pixabay', 'coverr']
+export const IMAGE_SOURCES: MediaSource[] = ['shutterstock', 'unsplash', 'pexels', 'pixabay', 'coverr', 'giphy', 'flickr', 'newsapi', 'gnews']
 export const VIDEO_SOURCES: MediaSource[] = ['youtube', 'pexels', 'pixabay', 'coverr']
