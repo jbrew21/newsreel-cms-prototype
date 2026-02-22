@@ -198,6 +198,7 @@ export default function CreateContentPage() {
         is_k12: parsed.is_k12 ?? false,
         is_premium: parsed.is_premium ?? false,
         story_media_source: parsed.story_media_source || null,
+        allowed_domains: parsed.allowed_domains || null,
         slides: (parsed.slides || []).map((slide: any) => ({
           id: slide.id,
           slideIndex: slide.slideIndex,
@@ -436,6 +437,7 @@ export default function CreateContentPage() {
       is_k12: storyData.is_k12 ?? false,
       is_premium: storyData.is_premium ?? false,
       story_media_source: storyData.story_media_source || null,
+      allowed_domains: storyData.allowed_domains || null,
       slides: storyData.slides.map(slide => ({
         id: slide.id,
         slideIndex: slide.slideIndex,
@@ -769,6 +771,86 @@ export default function CreateContentPage() {
                     <span className="text-sm font-medium text-foreground">Premium</span>
                   </label>
                 </div>
+
+                {/* Campus Visibility (optional, collapsible) */}
+                {storyData.allowed_domains && storyData.allowed_domains.length > 0 ? (
+                  <div className="space-y-3 pt-2 border-t border-border/50">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-foreground text-sm">
+                        Campus Visibility
+                      </Label>
+                      <button
+                        type="button"
+                        onClick={() => setStoryData(prev => ({ ...prev, allowed_domains: null }))}
+                        className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        Make public
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {storyData.allowed_domains.map((domain, idx) => (
+                        <span
+                          key={idx}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary/10 text-primary text-sm"
+                        >
+                          {domain}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = storyData.allowed_domains!.filter((_, i) => i !== idx)
+                              setStoryData(prev => ({
+                                ...prev,
+                                allowed_domains: updated.length > 0 ? updated : null,
+                              }))
+                            }}
+                            className="hover:text-destructive transition-colors"
+                            aria-label={`Remove ${domain}`}
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                      <input
+                        type="text"
+                        placeholder="add domain..."
+                        className="bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none w-32"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ',') {
+                            e.preventDefault()
+                            const value = (e.target as HTMLInputElement).value.trim().toLowerCase().replace(/^@/, '')
+                            if (value && !storyData.allowed_domains?.includes(value)) {
+                              setStoryData(prev => ({
+                                ...prev,
+                                allowed_domains: [...(prev.allowed_domains || []), value],
+                              }))
+                            }
+                            ;(e.target as HTMLInputElement).value = ''
+                          }
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Only readers with these email domains will see this story.
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Auto-fill with author's email domain if available
+                      const email = author?.author_email || user?.email
+                      const domain = email?.split('@')[1]
+                      setStoryData(prev => ({
+                        ...prev,
+                        allowed_domains: domain ? [domain] : [],
+                      }))
+                    }}
+                    className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors pt-1"
+                  >
+                    <Plus className="h-3 w-3" />
+                    Limit to campus readers
+                  </button>
+                )}
               </div>
             </Card>
 

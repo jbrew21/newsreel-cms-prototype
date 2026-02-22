@@ -16,6 +16,8 @@ import { corsHeaders, resolveMediaUrl, buildStorySummary } from '@/lib/supabase/
  *   - status ("published" | "draft" | "all", default: "published")
  *   - sort ("newest" | "oldest", default: "newest")
  *   - search or q (string) — search in story_headline and subhead (case-insensitive)
+ *   - domain (string) — filter stories visible to this email domain (e.g. "nyu.edu").
+ *       Returns stories where allowed_domains is null (public) OR contains the domain.
  *
  * Returns: { stories: [...], pagination: { page, limit, total, total_pages } }
  */
@@ -29,6 +31,7 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get('status') || 'published'
   const sort = searchParams.get('sort') || 'newest'
   const search = searchParams.get('search') || searchParams.get('q')
+  const domain = searchParams.get('domain')
 
   const offset = (page - 1) * limit
 
@@ -82,6 +85,10 @@ export async function GET(request: NextRequest) {
     if (search) {
       // Case-insensitive search in headline and subhead
       query = query.or(`story_headline.ilike.%${search}%,subhead.ilike.%${search}%`)
+    }
+    if (domain) {
+      // Return public stories (null allowed_domains) + stories that include this domain
+      query = query.or(`allowed_domains.is.null,allowed_domains.cs.{"${domain}"}`)
     }
 
     // Sort

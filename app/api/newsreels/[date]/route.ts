@@ -15,6 +15,7 @@ export async function GET(
   { params }: { params: Promise<{ date: string }> }
 ) {
   const { date } = await params
+  const domain = request.nextUrl.searchParams.get('domain')
 
   // Validate date format
   if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -33,7 +34,7 @@ export async function GET(
       .maybeSingle()
 
     // Fetch all published stories for this date
-    const { data: stories, error } = await supabase
+    let query = supabase
       .from('stories')
       .select(`
         *,
@@ -63,6 +64,13 @@ export async function GET(
       .not('published_at', 'is', null)
       .order('published_at', { ascending: false })
 
+    // Domain gating: return public + domain-matching stories
+    if (domain) {
+      query = query.or(`allowed_domains.is.null,allowed_domains.cs.{"${domain}"}`)
+    }
+
+    const { data: stories, error } = await query
+
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500, headers: corsHeaders })
     }
@@ -86,6 +94,7 @@ export async function GET(
         is_premium: story.is_premium,
         is_k12: story.is_k12,
         is_breaking: story.is_breaking,
+        allowed_domains: story.allowed_domains || null,
         author: author
           ? {
               id: author.id,

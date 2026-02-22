@@ -74,6 +74,7 @@ export async function saveBriefPost(params: {
       is_k12: draftState.is_k12 ?? false,
       is_breaking: false,
       story_media_source: draftState.story_media_source?.trim() || null,
+      allowed_domains: draftState.allowed_domains?.length ? draftState.allowed_domains : null,
     }
 
     const { data: storyData, error: storyError } = await supabase
@@ -546,6 +547,7 @@ export async function getFullBriefStory(storyId: string): Promise<{
     is_k12: story.is_k12 ?? false,
     is_premium: story.is_premium ?? false,
     story_media_source: story.story_media_source || null,
+    allowed_domains: story.allowed_domains || null,
     slides,
     quiz: quizFormData,
     poll: pollFormData,
@@ -603,6 +605,7 @@ export async function updateBriefPost(params: {
         is_premium: draftState.is_premium ?? false,
         is_k12: draftState.is_k12 ?? false,
         story_media_source: draftState.story_media_source?.trim() || null,
+        allowed_domains: draftState.allowed_domains?.length ? draftState.allowed_domains : null,
         published_at: publishedAt,
         updated_at: new Date().toISOString(),
       })

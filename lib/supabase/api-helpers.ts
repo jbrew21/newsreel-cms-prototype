@@ -68,6 +68,7 @@ export function buildStorySummary(story: any, coverUrl: string | null, author: a
     cover_url: coverUrl,
     cover_media_type: story.story_media?.find((sm: any) => sm.role === 'cover')?.media_assets?.media_type || null,
     story_media_source: story.story_media_source || null,
+    allowed_domains: story.allowed_domains || null,
     author: author
       ? {
           id: author.id,
