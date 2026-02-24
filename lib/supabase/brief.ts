@@ -62,7 +62,7 @@ export async function saveBriefPost(params: {
     // If no story_date provided, use the publish date or current date
     const storyDate = draftState.story_date || (publishedAt ? publishedAt.split('T')[0] : new Date().toISOString().split('T')[0])
     // If no story_type provided, default to 'brief'
-    const storyType = draftState.story_type?.trim() || 'brief'
+    const storyType = draftState.story_type?.trim() || 'Brief'
 
     const storyInsert: StoryInsert = {
       story_headline: draftState.story_headline || null,
