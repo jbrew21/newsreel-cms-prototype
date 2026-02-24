@@ -1010,3 +1010,124 @@ export async function updateBriefPost(params: {
     }
   }
 }
+
+// ============================================
+// Delete Story
+// ============================================
+
+/**
+ * Delete a story and all its related data:
+ * storage files, media assets, slides, quiz, poll, author links.
+ */
+export async function deleteStory(storyId: string): Promise<{
+  success: boolean
+  error?: string
+}> {
+  try {
+    // 1. Collect all storage files to delete
+    const filesToRemove: { bucket: string; path: string }[] = []
+
+    // Story cover media
+    const { data: storyMediaLinks } = await supabase
+      .from('story_media')
+      .select('media_id, media_assets ( id, bucket, object_path )')
+      .eq('story_id', storyId)
+
+    if (storyMediaLinks) {
+      for (const link of storyMediaLinks) {
+        const asset = (link as any).media_assets
+        if (asset) {
+          filesToRemove.push({ bucket: asset.bucket, path: asset.object_path })
+        }
+      }
+    }
+
+    // Slide media
+    const { data: slides } = await supabase
+      .from('slides')
+      .select('id')
+      .eq('story_id', storyId)
+
+    if (slides) {
+      for (const slide of slides) {
+        const { data: slideMediaLinks } = await supabase
+          .from('slide_media')
+          .select('media_id, media_assets ( id, bucket, object_path )')
+          .eq('slide_id', slide.id)
+
+        if (slideMediaLinks) {
+          for (const link of slideMediaLinks) {
+            const asset = (link as any).media_assets
+            if (asset) {
+              filesToRemove.push({ bucket: asset.bucket, path: asset.object_path })
+            }
+          }
+        }
+      }
+    }
+
+    // 2. Delete storage files (grouped by bucket)
+    const byBucket = new Map<string, string[]>()
+    for (const f of filesToRemove) {
+      const arr = byBucket.get(f.bucket) || []
+      arr.push(f.path)
+      byBucket.set(f.bucket, arr)
+    }
+    for (const [bucket, paths] of byBucket) {
+      await supabase.storage.from(bucket).remove(paths)
+    }
+
+    // 3. Delete slide_media + media_assets for each slide
+    if (slides) {
+      for (const slide of slides) {
+        const { data: smLinks } = await supabase
+          .from('slide_media')
+          .select('media_id')
+          .eq('slide_id', slide.id)
+
+        if (smLinks) {
+          await supabase.from('slide_media').delete().eq('slide_id', slide.id)
+          for (const link of smLinks) {
+            await supabase.from('media_assets').delete().eq('id', link.media_id)
+          }
+        }
+      }
+    }
+
+    // 4. Delete story_media + media_assets
+    if (storyMediaLinks) {
+      await supabase.from('story_media').delete().eq('story_id', storyId)
+      for (const link of storyMediaLinks) {
+        await supabase.from('media_assets').delete().eq('id', link.media_id)
+      }
+    }
+
+    // 5. Delete slides
+    await supabase.from('slides').delete().eq('story_id', storyId)
+
+    // 6. Delete quiz and poll
+    await supabase.from('quizzes').delete().eq('story_id', storyId)
+    await supabase.from('polls').delete().eq('story_id', storyId)
+
+    // 7. Delete author links
+    await supabase.from('authors_stories_links').delete().eq('story_id', storyId)
+
+    // 8. Delete the story
+    const { error: storyError } = await supabase
+      .from('stories')
+      .delete()
+      .eq('id', storyId)
+
+    if (storyError) {
+      throw new Error(`Failed to delete story: ${storyError.message}`)
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Error deleting story:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error occurred',
+    }
+  }
+}

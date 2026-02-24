@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { LogOut, Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users } from 'lucide-react'
+import { LogOut, Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2 } from 'lucide-react'
+import { deleteStory } from '@/lib/supabase/brief'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { AIStoryGenerator } from '@/components/ai-story-generator'
@@ -64,6 +65,8 @@ export default function DashboardPage() {
   const [allStories, setAllStories] = useState<StoryWithMedia[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [allStoriesLoading, setAllStoriesLoading] = useState(false)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     checkUser()
@@ -308,6 +311,29 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Error logging out:', error)
     }
+  }
+
+  const handleDeleteStory = async (storyId: string) => {
+    setDeleting(true)
+    const result = await deleteStory(storyId)
+    if (result.success) {
+      // Remove from local state
+      setStories(prev => prev.filter(s => s.id !== storyId))
+      setAllStories(prev => prev.filter(s => s.id !== storyId))
+      setSelectedContent(null)
+      setDeleteConfirmId(null)
+    } else {
+      console.error('Delete failed:', result.error)
+    }
+    setDeleting(false)
+  }
+
+  const canDeleteSelectedStory = () => {
+    if (!selectedContent || selectedContent.type !== 'story') return false
+    // Internal team can delete any story
+    if (isInternalTeam) return true
+    // Authors can delete their own stories
+    return stories.some(s => s.id === selectedContent.data.id)
   }
 
   const formatJoinDate = (dateString: string | null) => {
@@ -805,7 +831,7 @@ export default function DashboardPage() {
       {selectedContent && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setSelectedContent(null)}
+          onClick={() => { setSelectedContent(null); setDeleteConfirmId(null) }}
         >
           <Card
             className="w-full max-w-2xl max-h-[90vh] overflow-hidden"
@@ -957,20 +983,58 @@ export default function DashboardPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-border flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setSelectedContent(null)}>
-                Close
-              </Button>
-              {selectedContent.type === 'story' && (
-                <Button
-                  onClick={() => {
-                    setSelectedContent(null)
-                    router.push(`/dashboard/create/content?format=brief&storyId=${selectedContent.data.id}`)
-                  }}
-                >
-                  Edit Story
+            <div className="p-4 border-t border-border flex items-center justify-between">
+              <div>
+                {selectedContent.type === 'story' && canDeleteSelectedStory() && (
+                  deleteConfirmId === selectedContent.data.id ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-destructive">Delete this story?</span>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={deleting}
+                        onClick={() => handleDeleteStory(selectedContent.data.id)}
+                      >
+                        {deleting ? 'Deleting...' : 'Yes, delete'}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={deleting}
+                        onClick={() => setDeleteConfirmId(null)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground hover:text-destructive"
+                      onClick={() => setDeleteConfirmId(selectedContent.data.id)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Delete
+                    </Button>
+                  )
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => { setSelectedContent(null); setDeleteConfirmId(null) }}>
+                  Close
                 </Button>
-              )}
+                {selectedContent.type === 'story' && (
+                  <Button
+                    onClick={() => {
+                      setSelectedContent(null)
+                      setDeleteConfirmId(null)
+                      router.push(`/dashboard/create/content?format=brief&storyId=${selectedContent.data.id}`)
+                    }}
+                  >
+                    Edit Story
+                  </Button>
+                )}
+              </div>
             </div>
           </Card>
         </div>
