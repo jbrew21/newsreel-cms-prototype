@@ -495,7 +495,7 @@ export default function CreateContentPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => router.push(isEditMode ? '/dashboard' : '/dashboard/create')}
+                onClick={() => router.push('/dashboard')}
                 aria-label="Go back"
               >
                 <ArrowLeft className="h-5 w-5" />

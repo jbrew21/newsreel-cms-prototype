@@ -429,7 +429,12 @@ export default function DashboardPage() {
             )}
             <Button
               variant="default"
-              onClick={() => router.push('/dashboard/create')}
+              onClick={() => {
+                // Skip format selection — default to brief for now
+                sessionStorage.removeItem('briefDraftState')
+                sessionStorage.removeItem('aiGenerated')
+                router.push('/dashboard/create/content?format=brief')
+              }}
             >
               <Plus className="h-4 w-4 mr-2" />
               Create a story

@@ -28,7 +28,10 @@ export default function CreateStoryPage() {
   const [selectedFormat, setSelectedFormat] = useState<FormatType>(null)
 
   useEffect(() => {
-    checkUser()
+    // Skip format selection — redirect to brief content directly
+    sessionStorage.removeItem('briefDraftState')
+    sessionStorage.removeItem('aiGenerated')
+    router.replace('/dashboard/create/content?format=brief')
   }, [])
 
   const checkUser = async () => {
