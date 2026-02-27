@@ -48,7 +48,7 @@ Return valid JSON with this exact structure:
 {
   "story_headline": "Short punchy headline in active voice",
   "subhead": "A brief subtitle providing additional context",
-  "story_type": "brief",
+  "story_type": "Brief",
   "needs_trigger_warning": false,
   "slides": [
     {

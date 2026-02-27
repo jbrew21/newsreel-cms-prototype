@@ -108,7 +108,7 @@ export function AIStoryGenerator({ authorId, authorName }: AIStoryGeneratorProps
         headlinePhotoUrl: null,
         author_id: authorId,
         author_name: authorName,
-        story_type: story.story_type || 'brief',
+        story_type: story.story_type || 'Brief',
         story_date: null,
         is_k12: false,
         is_premium: false,

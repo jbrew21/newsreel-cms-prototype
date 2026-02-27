@@ -592,8 +592,8 @@ export async function updateBriefPost(params: {
     // ========================================
     // If no story_date provided, keep existing or use publish/update date
     const storyDate = draftState.story_date || (publishedAt ? publishedAt.split('T')[0] : new Date().toISOString().split('T')[0])
-    // If no story_type provided, default to 'brief'
-    const storyType = draftState.story_type?.trim() || 'brief'
+    // If no story_type provided, default to 'Brief'
+    const storyType = draftState.story_type?.trim() || 'Brief'
 
     const { error: storyError } = await supabase
       .from('stories')
