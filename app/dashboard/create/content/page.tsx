@@ -1280,8 +1280,8 @@ export default function CreateContentPage() {
                     />
                   </div>
 
-                  {/* Weight Parameters */}
-                  <div className="grid grid-cols-3 gap-4">
+                  {/* Weight Parameters - hidden from authors, data preserved */}
+                  {/* <div className="grid grid-cols-3 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="econ-weight" className="text-foreground">
                         Economic Weight
@@ -1342,7 +1342,7 @@ export default function CreateContentPage() {
                         className="bg-background"
                       />
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               ) : (
                 <Button
