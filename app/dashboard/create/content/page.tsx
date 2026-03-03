@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video } from 'lucide-react'
+import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video, ChevronDown } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
 import type { SlideFormData, BriefFormData, QuizFormData, PollFormData, EditBriefMetadata } from '@/lib/supabase/types'
@@ -26,6 +26,19 @@ interface Author {
   author_email: string | null
   created_at: string | null
 }
+
+const SUBHEADLINE_PRESETS = [
+  'The hook 🪝',
+  'Zoom in 🔍',
+  'Zoom out 🌎',
+  'Rewind ⏪',
+  'By the numbers 📊',
+  'What to watch for 👀',
+  'Counterpoint 🔄',
+  'Yes, but… 👇',
+  'Food for thought 🍎',
+  'Tangent 🌀',
+]
 
 // Global storage for File objects (can't be serialized to sessionStorage)
 declare global {
@@ -922,13 +935,32 @@ export default function CreateContentPage() {
                             <Label htmlFor={`subheadline-${slide.id}`} className="text-foreground">
                               Subheadline
                             </Label>
-                            <Input
-                              id={`subheadline-${slide.id}`}
-                              value={slide.slide_headline_1 || ''}
-                              onChange={(e) => handleSlideChange(slide.id, 'slide_headline_1', e.target.value)}
-                              placeholder="Slide subheadline"
-                              className="bg-background"
-                            />
+                            <div className="flex gap-2">
+                              <div className="relative">
+                                <select
+                                  className="appearance-none bg-background border border-input rounded-md px-3 py-2 pr-8 text-sm cursor-pointer hover:bg-accent/50 transition-colors"
+                                  value=""
+                                  onChange={(e) => {
+                                    if (e.target.value) {
+                                      handleSlideChange(slide.id, 'slide_headline_1', e.target.value)
+                                    }
+                                  }}
+                                >
+                                  <option value="" disabled>Presets</option>
+                                  {SUBHEADLINE_PRESETS.map((preset) => (
+                                    <option key={preset} value={preset}>{preset}</option>
+                                  ))}
+                                </select>
+                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                              </div>
+                              <Input
+                                id={`subheadline-${slide.id}`}
+                                value={slide.slide_headline_1 || ''}
+                                onChange={(e) => handleSlideChange(slide.id, 'slide_headline_1', e.target.value)}
+                                placeholder="Slide subheadline"
+                                className="bg-background flex-1"
+                              />
+                            </div>
                           </div>
 
                           {/* Body */}
