@@ -109,15 +109,32 @@ export async function GET(
       .eq('story_id', id)
       .limit(1)
 
+    // Fetch captions for all slides in this story
+    const { data: captionRows } = await supabase
+      .from('slide_captions')
+      .select('slide_id, captions')
+      .eq('story_id', id)
+
+    // Build a lookup: slide_id → captions array
+    const captionsMap: Record<string, any> = {}
+    if (captionRows) {
+      for (const row of captionRows) {
+        captionsMap[row.slide_id] = row.captions
+      }
+    }
+
     // Resolve cover media
     const coverMedia = story.story_media?.find((sm: any) => sm.role === 'cover')
     const coverAsset = coverMedia?.media_assets || null
     const coverUrl = resolveMediaUrl(coverAsset)
 
-    // Build slides sorted by slide_index
+    // Build slides sorted by slide_index, with captions attached
     const sortedSlides = (story.slides || [])
       .sort((a: any, b: any) => a.slide_index - b.slide_index)
-      .map(buildSlideResponse)
+      .map((slide: any) => ({
+        ...buildSlideResponse(slide),
+        captions: captionsMap[slide.id] || null,
+      }))
 
     // Build author info
     const authorLinks = (story.authors_stories_links || [])

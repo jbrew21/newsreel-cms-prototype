@@ -317,6 +317,13 @@ export async function saveBriefPost(params: {
       }
     }
 
+    // Fire-and-forget: extract captions for video slides in background
+    fetch('/api/captions/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storyId }),
+    }).catch(() => {})
+
     return {
       storyId,
       success: true,
@@ -995,6 +1002,13 @@ export async function updateBriefPost(params: {
       // Poll was removed - delete it
       await supabase.from('polls').delete().eq('id', existingPollId)
     }
+
+    // Fire-and-forget: extract captions for video slides in background
+    fetch('/api/captions/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storyId }),
+    }).catch(() => {})
 
     return {
       storyId,
