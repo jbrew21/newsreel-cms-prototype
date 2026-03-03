@@ -324,6 +324,13 @@ export async function saveBriefPost(params: {
       body: JSON.stringify({ storyId }),
     }).catch(() => {})
 
+    // Fire-and-forget: generate audio narration in background
+    fetch('/api/audio/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storyId }),
+    }).catch(() => {})
+
     return {
       storyId,
       success: true,
@@ -1005,6 +1012,13 @@ export async function updateBriefPost(params: {
 
     // Fire-and-forget: extract captions for video slides in background
     fetch('/api/captions/extract', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ storyId }),
+    }).catch(() => {})
+
+    // Fire-and-forget: generate audio narration in background
+    fetch('/api/audio/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ storyId }),

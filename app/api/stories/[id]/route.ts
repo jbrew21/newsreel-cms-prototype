@@ -123,6 +123,14 @@ export async function GET(
       }
     }
 
+    // Fetch audio narration for this story
+    const { data: storyAudio } = await supabase
+      .from('story_audio')
+      .select('audio_url, narration_text, voice, duration_ms')
+      .eq('story_id', id)
+      .limit(1)
+      .single()
+
     // Resolve cover media
     const coverMedia = story.story_media?.find((sm: any) => sm.role === 'cover')
     const coverAsset = coverMedia?.media_assets || null
@@ -208,6 +216,14 @@ export async function GET(
       authors,
       quiz,
       poll,
+      audio: storyAudio
+        ? {
+            url: storyAudio.audio_url,
+            narration_text: storyAudio.narration_text,
+            voice: storyAudio.voice,
+            duration_ms: storyAudio.duration_ms,
+          }
+        : null,
       created_at: story.created_at,
       updated_at: story.updated_at,
       published_at: story.published_at,
