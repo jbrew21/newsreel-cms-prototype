@@ -123,6 +123,27 @@ export async function GET(
       })
     }
 
+    // Fetch monthly unique readers via RPC
+    let monthlyReaders = 0
+    const allStoryIds = (storyLinks || []).map((link: any) => link.story_id)
+    if (allStoryIds.length > 0) {
+      const now = new Date()
+      const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+      const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`
+
+      const { data: readersCount } = await supabase
+        .rpc('get_author_monthly_readers', {
+          story_ids: allStoryIds,
+          month_start: monthStart,
+          month_end: monthEnd,
+        })
+
+      if (typeof readersCount === 'number') {
+        monthlyReaders = readersCount
+      }
+    }
+
     const authorResponse = {
       id: author.id,
       first_name: author.author_first_name || null,
@@ -137,6 +158,7 @@ export async function GET(
       twitter: author.author_twitter || null,
       linkedin: author.author_linked_in || null,
       created_at: author.created_at,
+      monthly_readers: monthlyReaders,
     }
 
     const total = count || 0

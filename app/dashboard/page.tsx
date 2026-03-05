@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { LogOut, Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2 } from 'lucide-react'
+import { LogOut, Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, Eye } from 'lucide-react'
 import { deleteStory } from '@/lib/supabase/brief'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
@@ -67,6 +67,7 @@ export default function DashboardPage() {
   const [allStoriesLoading, setAllStoriesLoading] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [monthlyReaders, setMonthlyReaders] = useState(0)
 
   useEffect(() => {
     checkUser()
@@ -128,6 +129,23 @@ export default function DashboardPage() {
 
       if (storyLinks && storyLinks.length > 0) {
         const storyIds = storyLinks.map(link => link.story_id)
+
+        // Fetch monthly unique readers via RPC
+        const now = new Date()
+        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+        const nextMonthDate = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+        const monthEnd = `${nextMonthDate.getFullYear()}-${String(nextMonthDate.getMonth() + 1).padStart(2, '0')}-01`
+
+        const { data: readersCount } = await supabase
+          .rpc('get_author_monthly_readers', {
+            story_ids: storyIds,
+            month_start: monthStart,
+            month_end: monthEnd,
+          })
+
+        if (typeof readersCount === 'number') {
+          setMonthlyReaders(readersCount)
+        }
 
         const { data: storiesData } = await supabase
           .from('stories')
@@ -511,6 +529,15 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground mb-4">
                 {formatJoinDate(author?.created_at || null)}
               </p>
+              <div className="w-full text-center mb-3 p-3 bg-muted/50 rounded-lg">
+                <div className="flex items-center justify-center gap-1.5 mb-1">
+                  <Eye className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-2xl font-bold text-card-foreground">{monthlyReaders.toLocaleString()}</span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Unique readers this month
+                </div>
+              </div>
               <Button
                 variant="outline"
                 className="w-full"
