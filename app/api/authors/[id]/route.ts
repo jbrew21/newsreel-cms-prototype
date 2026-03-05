@@ -154,8 +154,8 @@ export async function GET(
           story_ids: allStoryIds,
         })
 
-      if (typeof accuracy === 'number') {
-        quizAccuracy = accuracy
+      if (accuracy !== null && accuracy !== undefined) {
+        quizAccuracy = Number(accuracy)
       }
     }
 

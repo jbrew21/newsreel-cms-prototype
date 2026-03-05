@@ -154,8 +154,8 @@ export default function DashboardPage() {
             story_ids: storyIds,
           })
 
-        if (typeof accuracy === 'number') {
-          setQuizAccuracy(accuracy)
+        if (accuracy !== null && accuracy !== undefined) {
+          setQuizAccuracy(Number(accuracy))
         }
 
         const { data: storiesData } = await supabase
