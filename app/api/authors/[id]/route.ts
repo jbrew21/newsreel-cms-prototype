@@ -125,6 +125,7 @@ export async function GET(
 
     // Fetch monthly unique readers via RPC
     let monthlyReaders = 0
+    let quizAccuracy = 0
     const allStoryIds = (storyLinks || []).map((link: any) => link.story_id)
     if (allStoryIds.length > 0) {
       const now = new Date()
@@ -141,6 +142,15 @@ export async function GET(
 
       if (typeof readersCount === 'number') {
         monthlyReaders = readersCount
+      }
+
+      const { data: accuracy } = await supabase
+        .rpc('get_author_quiz_accuracy', {
+          story_ids: allStoryIds,
+        })
+
+      if (typeof accuracy === 'number') {
+        quizAccuracy = accuracy
       }
     }
 
@@ -159,6 +169,8 @@ export async function GET(
       linkedin: author.author_linked_in || null,
       created_at: author.created_at,
       monthly_readers: monthlyReaders,
+      total_stories: count || 0,
+      quiz_accuracy: quizAccuracy,
     }
 
     const total = count || 0

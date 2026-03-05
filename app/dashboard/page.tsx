@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { LogOut, Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, Eye } from 'lucide-react'
+import { LogOut, Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, Eye, Target, BookOpen } from 'lucide-react'
 import { deleteStory } from '@/lib/supabase/brief'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
@@ -68,6 +68,7 @@ export default function DashboardPage() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [monthlyReaders, setMonthlyReaders] = useState(0)
+  const [quizAccuracy, setQuizAccuracy] = useState<number | null>(null)
 
   useEffect(() => {
     checkUser()
@@ -145,6 +146,16 @@ export default function DashboardPage() {
 
         if (typeof readersCount === 'number') {
           setMonthlyReaders(readersCount)
+        }
+
+        // Fetch quiz accuracy via RPC
+        const { data: accuracy } = await supabase
+          .rpc('get_author_quiz_accuracy', {
+            story_ids: storyIds,
+          })
+
+        if (typeof accuracy === 'number') {
+          setQuizAccuracy(accuracy)
         }
 
         const { data: storiesData } = await supabase
@@ -529,14 +540,30 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground mb-4">
                 {formatJoinDate(author?.created_at || null)}
               </p>
-              <div className="w-full text-center mb-3 p-3 bg-muted/50 rounded-lg">
-                <div className="flex items-center justify-center gap-1.5 mb-1">
-                  <Eye className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-2xl font-bold text-card-foreground">{monthlyReaders.toLocaleString()}</span>
+              <div className="w-full mb-3 p-3 bg-muted/50 rounded-lg space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <Eye className="h-3.5 w-3.5" />
+                    Readers this month
+                  </div>
+                  <span className="text-sm font-bold text-card-foreground">{monthlyReaders.toLocaleString()}</span>
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  Unique readers this month
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <BookOpen className="h-3.5 w-3.5" />
+                    Total stories
+                  </div>
+                  <span className="text-sm font-bold text-card-foreground">{totalStories}</span>
                 </div>
+                {quizAccuracy !== null && (
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <Target className="h-3.5 w-3.5" />
+                      Quiz accuracy
+                    </div>
+                    <span className="text-sm font-bold text-card-foreground">{quizAccuracy}%</span>
+                  </div>
+                )}
               </div>
               <Button
                 variant="outline"
