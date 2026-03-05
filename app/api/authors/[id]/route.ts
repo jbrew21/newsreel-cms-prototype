@@ -123,10 +123,15 @@ export async function GET(
       })
     }
 
-    // Fetch monthly unique readers via RPC
+    // Fetch ALL story IDs for stats (unpaginated)
+    const { data: allLinks } = await supabase
+      .from('authors_stories_links')
+      .select('story_id')
+      .eq('author_id', id)
+
     let monthlyReaders = 0
     let quizAccuracy = 0
-    const allStoryIds = (storyLinks || []).map((link: any) => link.story_id)
+    const allStoryIds = (allLinks || []).map((link: any) => link.story_id)
     if (allStoryIds.length > 0) {
       const now = new Date()
       const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
