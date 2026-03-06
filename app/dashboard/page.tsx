@@ -67,6 +67,7 @@ export default function DashboardPage() {
   const [allStoriesLoading, setAllStoriesLoading] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [monthlyReaders, setMonthlyReaders] = useState(0)
   const [quizAccuracy, setQuizAccuracy] = useState<number | null>(null)
 
@@ -355,6 +356,23 @@ export default function DashboardPage() {
       console.error('Delete failed:', result.error)
     }
     setDeleting(false)
+  }
+
+  const handlePublishStory = async (storyId: string) => {
+    setPublishing(true)
+    const { error } = await supabase
+      .from('stories')
+      .update({ published_at: new Date().toISOString() })
+      .eq('id', storyId)
+    if (!error) {
+      const now = new Date().toISOString()
+      setStories(prev => prev.map(s => s.id === storyId ? { ...s, published_at: now } : s))
+      setAllStories(prev => prev.map(s => s.id === storyId ? { ...s, published_at: now } : s))
+      setSelectedContent(null)
+    } else {
+      console.error('Publish failed:', error)
+    }
+    setPublishing(false)
   }
 
   const canDeleteSelectedStory = () => {
@@ -1079,9 +1097,19 @@ export default function DashboardPage() {
                 )}
               </div>
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => { setSelectedContent(null); setDeleteConfirmId(null) }}>
-                  Close
-                </Button>
+                {selectedContent.type === 'story' && !selectedContent.data.published_at ? (
+                  <Button
+                    disabled={publishing}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    onClick={() => handlePublishStory(selectedContent.data.id)}
+                  >
+                    {publishing ? 'Publishing...' : 'Publish'}
+                  </Button>
+                ) : (
+                  <Button variant="outline" onClick={() => { setSelectedContent(null); setDeleteConfirmId(null) }}>
+                    Close
+                  </Button>
+                )}
                 {selectedContent.type === 'story' && (
                   <Button
                     onClick={() => {
