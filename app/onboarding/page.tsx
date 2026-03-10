@@ -77,6 +77,13 @@ function OnboardingContent() {
 
   const [errors, setErrors] = useState<FormErrors>({})
 
+  // Password change state (edit mode only)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordSuccess, setPasswordSuccess] = useState(false)
+  const [passwordSubmitting, setPasswordSubmitting] = useState(false)
+
   useEffect(() => {
     checkUser()
   }, [])
@@ -174,6 +181,47 @@ function OnboardingContent() {
 
       setCoverFile(file)
       setCoverPreview(URL.createObjectURL(file))
+    }
+  }
+
+  const handlePasswordChange = async () => {
+    setPasswordError(null)
+    setPasswordSuccess(false)
+
+    if (!newPassword) {
+      setPasswordError('New password is required')
+      return
+    }
+    if (newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters')
+      return
+    }
+    if (newPassword !== confirmNewPassword) {
+      setPasswordError('New passwords do not match')
+      return
+    }
+
+    setPasswordSubmitting(true)
+
+    try {
+      // Update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+
+      if (updateError) {
+        setPasswordError(updateError.message)
+        setPasswordSubmitting(false)
+        return
+      }
+
+      setPasswordSuccess(true)
+      setNewPassword('')
+      setConfirmNewPassword('')
+    } catch (err) {
+      setPasswordError('An unexpected error occurred. Please try again.')
+    } finally {
+      setPasswordSubmitting(false)
     }
   }
 
@@ -515,8 +563,80 @@ function OnboardingContent() {
               </div>
             </div>
 
+            {/* Change Password (edit mode only) */}
+            {isEditMode && (
+              <div className="pt-4 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Change Password
+                </p>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="new_password">New Password</Label>
+                      <Input
+                        id="new_password"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => { setNewPassword(e.target.value); setPasswordError(null); setPasswordSuccess(false) }}
+                        placeholder="Enter new password"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="confirm_password">Confirm New Password</Label>
+                      <Input
+                        id="confirm_password"
+                        type="password"
+                        value={confirmNewPassword}
+                        onChange={(e) => { setConfirmNewPassword(e.target.value); setPasswordError(null); setPasswordSuccess(false) }}
+                        placeholder="Confirm new password"
+                      />
+                    </div>
+                  </div>
+
+                  {passwordError && (
+                    <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                      {passwordError}
+                    </div>
+                  )}
+
+                  {passwordSuccess && (
+                    <div className="rounded-md bg-green-500/10 border border-green-500/20 p-3 text-sm text-green-600 dark:text-green-400">
+                      Password updated successfully.
+                    </div>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handlePasswordChange}
+                    disabled={passwordSubmitting || (!newPassword && !confirmNewPassword)}
+                  >
+                    {passwordSubmitting ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Updating...
+                      </>
+                    ) : (
+                      'Update Password'
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Submit Button */}
-            <div className="pt-6">
+            <div className="pt-6 flex gap-3">
+              {isEditMode && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => router.push('/dashboard')}
+                  className="w-full"
+                  size="lg"
+                >
+                  Back to Dashboard
+                </Button>
+              )}
               <Button
                 onClick={handleSubmit}
                 disabled={submitting}

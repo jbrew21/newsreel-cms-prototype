@@ -11,11 +11,48 @@ import { useRouter } from 'next/navigation'
 export function LoginForm() {
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string>('')
   const router = useRouter()
+
+  const handlePasswordSignIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const { exists, authorEmail } = await checkAuthorExists(email)
+
+      if (!exists || !authorEmail) {
+        setError('No account found with this email address.')
+        setIsLoading(false)
+        return
+      }
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: authorEmail,
+        password,
+      })
+
+      if (signInError) {
+        setError(signInError.message)
+        setIsLoading(false)
+        return
+      }
+
+      if (data.user) {
+        router.push('/dashboard')
+      }
+    } catch (err) {
+      setError('An unexpected error occurred. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -148,7 +185,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={handleSendOTP} className="space-y-6">
+    <form onSubmit={showPassword ? handlePasswordSignIn : handleSendOTP} className="space-y-6">
       <div className="space-y-2">
         <Label htmlFor="email" className="text-sm font-medium text-foreground">
           Email<span className="text-primary">*</span>
@@ -165,6 +202,25 @@ export function LoginForm() {
         />
       </div>
 
+      {showPassword && (
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-sm font-medium text-foreground">
+            Password<span className="text-primary">*</span>
+          </Label>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            disabled={isLoading}
+            className="h-11 bg-background border-input text-foreground placeholder:text-muted-foreground"
+            autoFocus
+          />
+        </div>
+      )}
+
       {error && (
         <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
           {error}
@@ -174,10 +230,27 @@ export function LoginForm() {
       <Button
         type="submit"
         className="w-full h-11 text-base font-medium"
-        disabled={isLoading}
+        disabled={isLoading || (showPassword && !password)}
       >
-        {isLoading ? 'Sending OTP...' : 'Send OTP'}
+        {isLoading
+          ? (showPassword ? 'Signing in...' : 'Sending OTP...')
+          : (showPassword ? 'Sign In' : 'Send OTP')
+        }
       </Button>
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => {
+            setShowPassword(!showPassword)
+            setPassword('')
+            setError(null)
+          }}
+          className="text-sm text-muted-foreground underline hover:text-foreground transition-colors"
+        >
+          {showPassword ? 'use OTP' : 'use password'}
+        </button>
+      </div>
 
     </form>
   )
