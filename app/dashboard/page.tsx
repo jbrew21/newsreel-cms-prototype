@@ -547,7 +547,7 @@ export default function DashboardPage() {
                   </span>
                 </div>
               )}
-              <h2 className="text-lg font-semibold text-card-foreground mb-1">
+              <h2 className="text-lg font-heading text-card-foreground mb-1">
                 {getAuthorName()}
               </h2>
               <p className="text-sm text-muted-foreground mb-2">
@@ -595,7 +595,7 @@ export default function DashboardPage() {
 
           {/* Stories Contributed Card */}
           <Card className="p-6 flex flex-col justify-center items-center">
-            <div className="text-4xl font-bold text-card-foreground mb-2">
+            <div className="text-4xl font-heading text-card-foreground mb-2">
               {totalStories}
             </div>
             <div className="text-sm text-muted-foreground uppercase tracking-wide">
@@ -610,7 +610,7 @@ export default function DashboardPage() {
           <Card className="p-6 flex flex-col justify-center items-center">
             <div className="flex gap-6">
               <div className="text-center">
-                <div className="text-3xl font-bold text-card-foreground mb-1">
+                <div className="text-3xl font-heading text-card-foreground mb-1">
                   {stories.length}
                 </div>
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -620,7 +620,7 @@ export default function DashboardPage() {
               </div>
               <div className="w-px bg-border" />
               <div className="text-center">
-                <div className="text-3xl font-bold text-card-foreground mb-1">
+                <div className="text-3xl font-heading text-card-foreground mb-1">
                   {videoFeeds.length}
                 </div>
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -680,7 +680,7 @@ export default function DashboardPage() {
                 </button>
               </div>
             ) : (
-              <h2 className="text-xl font-semibold text-foreground">
+              <h2 className="text-xl font-heading text-foreground">
                 Your Content
               </h2>
             )}
@@ -704,7 +704,7 @@ export default function DashboardPage() {
                   <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                     <FileText className="h-8 w-8 text-muted-foreground" />
                   </div>
-                  <h3 className="text-lg font-semibold text-card-foreground mb-2">
+                  <h3 className="text-lg font-heading text-card-foreground mb-2">
                     No content yet
                   </h3>
                   <p className="text-muted-foreground mb-6 max-w-md mx-auto">
@@ -784,7 +784,7 @@ export default function DashboardPage() {
 
                       {/* Content info */}
                       <div className="p-4">
-                        <h3 className="font-semibold text-card-foreground line-clamp-2 mb-2">
+                        <h3 className="font-heading text-card-foreground line-clamp-2 mb-2">
                           {item.type === 'story'
                             ? item.data.story_headline || 'Untitled Story'
                             : item.data.headline || 'Untitled Video'
@@ -818,7 +818,7 @@ export default function DashboardPage() {
                   <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
                     <Search className="h-8 w-8 text-muted-foreground" />
                   </div>
-                  <h3 className="text-lg font-semibold text-card-foreground mb-2">
+                  <h3 className="text-lg font-heading text-card-foreground mb-2">
                     {searchQuery ? 'No stories found' : 'No stories yet'}
                   </h3>
                   <p className="text-muted-foreground max-w-md mx-auto">
@@ -877,7 +877,7 @@ export default function DashboardPage() {
 
                       {/* Content info */}
                       <div className="p-4">
-                        <h3 className="font-semibold text-card-foreground line-clamp-2 mb-2">
+                        <h3 className="font-heading text-card-foreground line-clamp-2 mb-2">
                           {story.story_headline || 'Untitled Story'}
                         </h3>
                         <div className="flex items-center gap-2 text-xs text-muted-foreground mb-1">
@@ -960,7 +960,7 @@ export default function DashboardPage() {
                   )}
 
                   <div className="p-6">
-                    <h2 className="text-2xl font-bold text-card-foreground mb-4">
+                    <h2 className="text-2xl font-heading text-card-foreground mb-4">
                       {selectedContent.data.story_headline || 'Untitled Story'}
                     </h2>
 
@@ -982,8 +982,8 @@ export default function DashboardPage() {
                       <div className={cn(
                         "px-2 py-0.5 rounded text-xs font-medium",
                         selectedContent.data.published_at
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          ? "bg-success/10 text-success dark:bg-success/20 dark:text-success"
+                          : "bg-secondary/20 text-secondary-foreground dark:bg-secondary/30 dark:text-secondary"
                       )}>
                         {selectedContent.data.published_at ? 'Published' : 'Draft'}
                       </div>
@@ -1013,7 +1013,7 @@ export default function DashboardPage() {
                   ) : null}
 
                   <div className="p-6">
-                    <h2 className="text-2xl font-bold text-card-foreground mb-2">
+                    <h2 className="text-2xl font-heading text-card-foreground mb-2">
                       {selectedContent.data.headline || 'Untitled Video'}
                     </h2>
 
@@ -1031,8 +1031,8 @@ export default function DashboardPage() {
                       <div className={cn(
                         "px-2 py-0.5 rounded text-xs font-medium",
                         selectedContent.data.published_at
-                          ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                          ? "bg-success/10 text-success dark:bg-success/20 dark:text-success"
+                          : "bg-secondary/20 text-secondary-foreground dark:bg-secondary/30 dark:text-secondary"
                       )}>
                         {selectedContent.data.published_at ? 'Published' : 'Draft'}
                       </div>
@@ -1100,7 +1100,7 @@ export default function DashboardPage() {
                 {selectedContent.type === 'story' && !selectedContent.data.published_at ? (
                   <Button
                     disabled={publishing}
-                    className="bg-green-600 hover:bg-green-700 text-white"
+                    className="bg-success hover:bg-success/90 text-success-foreground"
                     onClick={() => handlePublishStory(selectedContent.data.id)}
                   >
                     {publishing ? 'Publishing...' : 'Publish'}

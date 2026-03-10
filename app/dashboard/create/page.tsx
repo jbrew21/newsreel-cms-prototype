@@ -128,7 +128,7 @@ export default function CreateStoryPage() {
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-primary-foreground text-sm font-bold">N</span>
                 </div>
-                <h1 className="text-xl font-bold text-foreground">New Post</h1>
+                <h1 className="text-xl font-heading text-foreground">New Post</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -178,7 +178,7 @@ export default function CreateStoryPage() {
         <div className="max-w-3xl mx-auto">
           <Card className="p-8">
             <div className="mb-8">
-              <h2 className="text-2xl font-bold text-card-foreground mb-2">
+              <h2 className="text-2xl font-heading text-card-foreground mb-2">
                 Choose format.
               </h2>
               <p className="text-muted-foreground">
@@ -202,7 +202,7 @@ export default function CreateStoryPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-lg font-semibold text-card-foreground">
+                          <h3 className="text-lg font-heading text-card-foreground">
                             {format.title}
                           </h3>
                           <span className="text-sm text-muted-foreground">

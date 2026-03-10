@@ -521,7 +521,7 @@ export default function CreateContentPage() {
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-primary-foreground text-sm font-bold">N</span>
                 </div>
-                <h1 className="text-xl font-bold text-foreground">{isEditMode ? 'Edit Post' : 'New Post'}</h1>
+                <h1 className="text-xl font-heading text-foreground">{isEditMode ? 'Edit Post' : 'New Post'}</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">

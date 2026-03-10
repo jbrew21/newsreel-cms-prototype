@@ -354,7 +354,7 @@ export default function ResponsePage() {
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-primary-foreground text-sm font-bold">N</span>
                 </div>
-                <h1 className="text-xl font-bold text-foreground">NewsReel CMS</h1>
+                <h1 className="text-xl font-heading text-foreground">NewsReel CMS</h1>
               </div>
               <ThemeToggle />
             </div>
@@ -363,10 +363,10 @@ export default function ResponsePage() {
 
         <main className="container mx-auto px-4 py-16 max-w-2xl">
           <Card className="p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle2 className="h-8 w-8 text-green-600 dark:text-green-400" />
+            <div className="w-16 h-16 bg-success/10 dark:bg-success/20 rounded-full flex items-center justify-center mx-auto mb-6">
+              <CheckCircle2 className="h-8 w-8 text-success" />
             </div>
-            <h2 className="text-2xl font-bold text-card-foreground mb-2">
+            <h2 className="text-2xl font-heading text-card-foreground mb-2">
               {isVerticalVideo
                 ? 'Video Saved Successfully!'
                 : isEditMode
@@ -440,7 +440,7 @@ export default function ResponsePage() {
                 <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
                   <span className="text-primary-foreground text-sm font-bold">N</span>
                 </div>
-                <h1 className="text-xl font-bold text-foreground">{isEditMode ? 'Edit Post' : 'New Post'}</h1>
+                <h1 className="text-xl font-heading text-foreground">{isEditMode ? 'Edit Post' : 'New Post'}</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -500,7 +500,7 @@ export default function ResponsePage() {
       <main className="container mx-auto px-4 py-8 max-w-3xl pb-32">
         <Card className="p-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-bold text-card-foreground mb-2">
+            <h2 className="text-2xl font-heading text-card-foreground mb-2">
               Preview & Publish
             </h2>
             <p className="text-muted-foreground">
