@@ -96,6 +96,9 @@ export default function CreateContentPage() {
   const [coverPickerOpen, setCoverPickerOpen] = useState(false)
   const [coverSearchOpen, setCoverSearchOpen] = useState(false)
 
+  // Back confirmation modal
+  const [showBackConfirm, setShowBackConfirm] = useState(false)
+
   // Drag and drop state
   const [draggedSlideId, setDraggedSlideId] = useState<string | null>(null)
   const [dragOverSlideId, setDragOverSlideId] = useState<string | null>(null)
@@ -509,7 +512,7 @@ export default function CreateContentPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => router.push('/dashboard')}
+                onClick={() => setShowBackConfirm(true)}
                 aria-label="Go back"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -1412,6 +1415,38 @@ export default function CreateContentPage() {
           </div>
         </div>
       </footer>
+
+      {/* Back Confirmation Modal */}
+      {showBackConfirm && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setShowBackConfirm(false)}
+        >
+          <Card
+            className="w-full max-w-md p-6 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold text-foreground">Leave this page?</h2>
+            <p className="text-sm text-muted-foreground">
+              Any unsaved changes will be lost. Are you sure you want to go back?
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowBackConfirm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => router.push('/dashboard')}
+              >
+                Leave
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   )
 }
