@@ -1190,8 +1190,8 @@ export default function CreateContentPage() {
                   {/* Answer Options */}
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="quiz-answer-a" className="text-foreground">
-                        Answer A
+                      <Label htmlFor="quiz-answer-a" className="text-foreground font-semibold" style={{ color: '#DAA520' }}>
+                        Answer A (Correct)
                       </Label>
                       <Input
                         id="quiz-answer-a"
@@ -1200,8 +1200,9 @@ export default function CreateContentPage() {
                           ...prev,
                           quiz: prev.quiz ? { ...prev.quiz, quiz_answer_a: e.target.value } : null
                         }))}
-                        placeholder="Option A"
+                        placeholder="Option A (Correct Answer)"
                         className="bg-background"
+                        style={{ borderColor: '#DAA520', borderWidth: '2px' }}
                       />
                     </div>
                     <div className="space-y-2">
