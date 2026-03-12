@@ -735,15 +735,53 @@ export default function CreateContentPage() {
                     <Label htmlFor="story-type" className="text-foreground">
                       Story Type
                     </Label>
-                    <Input
-                      id="story-type"
-                      value={storyData.story_type || ''}
-                      onChange={(e) => setStoryData(prev => ({ ...prev, story_type: e.target.value || null }))}
-                      placeholder="e.g. explainer, feature, brief"
-                      className="bg-background"
-                    />
+                    {(() => {
+                      const STORY_TYPE_OPTIONS = [
+                        'Brief', 'Explainer', 'Feature', 'Exposé', 'Breaking',
+                        'Politics', 'Business', 'Culture', 'Science', 'Technology',
+                        'Health', 'Sports', 'Opinion', 'Investigation'
+                      ]
+                      const currentValue = storyData.story_type || ''
+                      const isCustom = currentValue !== '' && !STORY_TYPE_OPTIONS.some(
+                        opt => opt.toLowerCase() === currentValue.toLowerCase()
+                      )
+                      return (
+                        <div className="flex gap-2">
+                          <div className="relative w-full">
+                          <select
+                            id="story-type"
+                            value={isCustom ? '__custom__' : currentValue}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              if (val === '__custom__') {
+                                setStoryData(prev => ({ ...prev, story_type: '' }))
+                              } else {
+                                setStoryData(prev => ({ ...prev, story_type: val || null }))
+                              }
+                            }}
+                            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 pr-9 text-sm ring-offset-background text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 appearance-none cursor-pointer"
+                          >
+                            <option value="" className="bg-background text-foreground">Select type...</option>
+                            {STORY_TYPE_OPTIONS.map(opt => (
+                              <option key={opt} value={opt} className="bg-background text-foreground">{opt}</option>
+                            ))}
+                            <option value="__custom__" className="bg-background text-foreground">Custom...</option>
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          </div>
+                          {isCustom && (
+                            <Input
+                              value={currentValue}
+                              onChange={(e) => setStoryData(prev => ({ ...prev, story_type: e.target.value || null }))}
+                              placeholder="Enter custom type"
+                              className="bg-background"
+                            />
+                          )}
+                        </div>
+                      )
+                    })()}
                     <p className="text-xs text-muted-foreground">
-                      Optional. Defaults to &quot;brief&quot; if empty.
+                      Optional. Defaults to &quot;Brief&quot; if empty.
                     </p>
                   </div>
 
