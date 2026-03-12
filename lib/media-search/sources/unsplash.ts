@@ -5,7 +5,7 @@ export async function searchUnsplash(query: string, count = 15): Promise<MediaIt
   if (!key) return []
   const params = new URLSearchParams({
     query,
-    per_page: Math.min(count * 3, 30).toString(),
+    per_page: '30',
     orientation: 'landscape',
     order_by: 'relevant',
     content_filter: 'low',

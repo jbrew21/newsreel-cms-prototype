@@ -7,7 +7,7 @@ export async function searchFlickrImages(query: string, count = 15): Promise<Med
     method: 'flickr.photos.search',
     api_key: key,
     text: query,
-    per_page: Math.min(count * 2, 50).toString(),
+    per_page: Math.min(count * 2, 60).toString(),
     format: 'json',
     nojsoncallback: '1',
     extras: 'url_l,url_m,url_s,owner_name,tags',

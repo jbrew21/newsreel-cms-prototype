@@ -6,7 +6,7 @@ export async function searchNewsApiImages(query: string, count = 15): Promise<Me
   const params = new URLSearchParams({
     q: query,
     apiKey: key,
-    pageSize: Math.min(count * 2, 100).toString(),
+    pageSize: Math.min(count * 2, 60).toString(),
     sortBy: 'relevancy',
     language: 'en',
   })

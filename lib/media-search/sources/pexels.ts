@@ -3,7 +3,7 @@ import type { MediaItem } from '../types'
 export async function searchPexelsImages(query: string, count = 15): Promise<MediaItem[]> {
   const key = process.env.PEXELS_API_KEY || ''
   if (!key) return []
-  const params = new URLSearchParams({ query, per_page: '30', orientation: 'landscape' })
+  const params = new URLSearchParams({ query, per_page: Math.min(count, 50).toString(), orientation: 'landscape' })
   const res = await fetch(`https://api.pexels.com/v1/search?${params}`, {
     headers: { Authorization: key },
   })

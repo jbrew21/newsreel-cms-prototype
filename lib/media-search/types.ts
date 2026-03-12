@@ -9,6 +9,7 @@ export type MediaSource =
   | 'flickr'
   | 'newsapi'
   | 'gnews'
+  | 'wikimedia'
 
 export type MediaType = 'image' | 'video'
 
@@ -34,7 +35,8 @@ export const SOURCE_LABELS: Record<MediaSource, string> = {
   flickr: 'Flickr',
   newsapi: 'NewsAPI',
   gnews: 'GNews',
+  wikimedia: 'Wikimedia Commons',
 }
 
-export const IMAGE_SOURCES: MediaSource[] = ['shutterstock', 'unsplash', 'pexels', 'pixabay', 'coverr', 'giphy', 'flickr', 'newsapi', 'gnews']
+export const IMAGE_SOURCES: MediaSource[] = ['shutterstock', 'unsplash', 'pexels', 'pixabay', 'coverr', 'giphy', 'flickr', 'newsapi', 'gnews', 'wikimedia']
 export const VIDEO_SOURCES: MediaSource[] = ['youtube', 'pexels', 'pixabay', 'coverr']

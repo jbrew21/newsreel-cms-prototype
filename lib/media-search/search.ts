@@ -9,8 +9,9 @@ import { searchGiphy } from './sources/giphy'
 import { searchFlickrImages } from './sources/flickr'
 import { searchNewsApiImages } from './sources/newsapi'
 import { searchGNewsImages } from './sources/gnews'
+import { searchWikimediaCommons } from './sources/wikimedia'
 
-export async function searchAllImages(query: string, perSource = 15): Promise<MediaItem[]> {
+export async function searchAllImages(query: string, perSource = 30): Promise<MediaItem[]> {
   const results = await Promise.allSettled([
     searchShutterstock(query, perSource),
     searchUnsplash(query, perSource),
@@ -20,7 +21,8 @@ export async function searchAllImages(query: string, perSource = 15): Promise<Me
     searchGiphy(query, perSource),
     searchFlickrImages(query, perSource),
     searchNewsApiImages(query, perSource),
-    searchGNewsImages(query, perSource),
+    searchGNewsImages(query, 10),
+    searchWikimediaCommons(query, perSource),
   ])
   const all: MediaItem[] = []
   for (const r of results) {
