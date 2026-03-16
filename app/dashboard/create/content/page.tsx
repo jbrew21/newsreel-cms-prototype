@@ -451,6 +451,7 @@ export default function CreateContentPage() {
       author_id: storyData.author_id,
       author_name: storyData.author_name,
       story_type: storyData.story_type || 'Brief',
+      story_date: storyData.story_date || null,
       is_k12: storyData.is_k12 ?? false,
       is_premium: storyData.is_premium ?? false,
       story_media_source: storyData.story_media_source || null,
