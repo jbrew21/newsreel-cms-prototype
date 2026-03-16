@@ -17,6 +17,7 @@ import VerticalVideoContent from '@/components/create/vertical-video-content'
 import { MediaPickerModal } from '@/components/media-picker-modal'
 import { MediaSearchModal } from '@/components/media-search-modal'
 import type { MediaItem } from '@/lib/media-search/types'
+import { AIStoryGenerator } from '@/components/ai-story-generator'
 
 interface Author {
   id: string
@@ -266,6 +267,46 @@ export default function CreateContentPage() {
       return `${author.author_first_name || ''} ${author.author_last_name || ''}`.trim()
     }
     return user?.email?.split('@')[0] || 'Author'
+  }
+
+  const handleAIGenerated = (draftState: any) => {
+    setStoryData(prev => ({
+      ...prev,
+      story_headline: draftState.story_headline || '',
+      subhead: draftState.subhead || null,
+      headlinePhoto: null,
+      headlinePhotoUrl: undefined,
+      author_id: draftState.author_id || prev.author_id,
+      author_name: draftState.author_name || prev.author_name,
+      story_type: draftState.story_type || null,
+      story_date: draftState.story_date || null,
+      is_k12: draftState.is_k12 ?? false,
+      is_premium: draftState.is_premium ?? false,
+      slides: (draftState.slides || []).map((slide: any) => ({
+        id: slide.id,
+        slideIndex: slide.slideIndex,
+        slide_headline_1: slide.slide_headline_1 || '',
+        slide_content_1: slide.slide_content_1 || '',
+        slide_headline_2: slide.slide_headline_2 || '',
+        slide_content_2: slide.slide_content_2 || '',
+        slide_quote: slide.slide_quote || '',
+        slide_media_source: slide.slide_media_source || '',
+        portrait_video: slide.portrait_video || false,
+        mediaFiles: [],
+        savedMediaUrls: [],
+      })),
+      quiz: draftState.quiz || null,
+      poll: draftState.poll || null,
+    }))
+    // Clear media previews since AI doesn't generate media files
+    setHeadlinePhotoPreview(null)
+    setSlideMediaPreviews(new Map())
+    if (window.__briefMediaFiles) {
+      window.__briefMediaFiles = {
+        headlinePhoto: null,
+        slideMedia: new Map(),
+      }
+    }
   }
 
   const handleAddSlide = () => {
@@ -578,6 +619,15 @@ export default function CreateContentPage() {
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8 max-w-4xl pb-24">
         <div className="space-y-8">
+            {/* AI Story Generator - only show for new stories */}
+            {!isEditMode && (
+              <AIStoryGenerator
+                authorId={author?.id || null}
+                authorName={getAuthorName()}
+                onGenerated={handleAIGenerated}
+              />
+            )}
+
             {/* Story Details */}
             <Card className="p-6">
               <h2 className="text-lg font-semibold text-card-foreground mb-6">

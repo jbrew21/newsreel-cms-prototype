@@ -37,9 +37,10 @@ interface GeneratedStory {
 interface AIStoryGeneratorProps {
   authorId: string | null
   authorName: string
+  onGenerated?: (draftState: any) => void
 }
 
-export function AIStoryGenerator({ authorId, authorName }: AIStoryGeneratorProps) {
+export function AIStoryGenerator({ authorId, authorName, onGenerated }: AIStoryGeneratorProps) {
   const router = useRouter()
   const [prompt, setPrompt] = useState('')
   const [slideCount, setSlideCount] = useState(4)
@@ -126,20 +127,26 @@ export function AIStoryGenerator({ authorId, authorName }: AIStoryGeneratorProps
         poll: null,
       }
 
-      // Store in sessionStorage for content page to pick up
-      sessionStorage.setItem('briefDraftState', JSON.stringify(draftState))
-      sessionStorage.setItem('aiGenerated', 'true')
+      if (onGenerated) {
+        // Inline mode: pass draft directly to parent, no redirect
+        onGenerated(draftState)
+        setPrompt('')
+      } else {
+        // Standalone mode: store in sessionStorage and redirect
+        sessionStorage.setItem('briefDraftState', JSON.stringify(draftState))
+        sessionStorage.setItem('aiGenerated', 'true')
 
-      // Clear any previous file references
-      if (typeof window !== 'undefined') {
-        window.__briefMediaFiles = {
-          headlinePhoto: null,
-          slideMedia: new Map(),
+        // Clear any previous file references
+        if (typeof window !== 'undefined') {
+          window.__briefMediaFiles = {
+            headlinePhoto: null,
+            slideMedia: new Map(),
+          }
         }
-      }
 
-      // Navigate to content page with brief format selected
-      router.push('/dashboard/create/content?format=brief')
+        // Navigate to content page with brief format selected
+        router.push('/dashboard/create/content?format=brief')
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.')
     } finally {
