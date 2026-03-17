@@ -1,10 +1,14 @@
 import { LoginForm } from '@/components/auth/login-form'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { Logo } from '@/components/brand/logo'
+import { StaticCanvas } from '@/components/effects/static-canvas'
 
 export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col bg-background relative">
+      {/* VHS Static Effect */}
+      <StaticCanvas />
+
       {/* Theme Toggle - Top Right */}
       <div className="absolute top-4 right-4 z-10">
         <ThemeToggle />
