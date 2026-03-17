@@ -193,13 +193,16 @@ export function LoginForm() {
         <Input
           id="email"
           type="email"
-          placeholder="brijesh@newsreel.co"
+          placeholder="your@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           required
           disabled={isLoading}
           className="h-11 bg-background border-input text-foreground placeholder:text-muted-foreground"
         />
+        <p className="text-xs text-muted-foreground mt-1.5">
+          New here? Just enter your email and we&apos;ll set you up.
+        </p>
       </div>
 
       {showPassword && (
@@ -229,12 +232,13 @@ export function LoginForm() {
 
       <Button
         type="submit"
-        className="w-full h-11 text-base font-medium"
+        className="w-full h-12 text-base font-medium tracking-wide"
+        style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace' }}
         disabled={isLoading || (showPassword && !password)}
       >
         {isLoading
           ? (showPassword ? 'Signing in...' : 'Sending OTP...')
-          : (showPassword ? 'Sign In' : 'Send OTP')
+          : (showPassword ? 'Sign In' : 'Get Started')
         }
       </Button>
 
