@@ -8,6 +8,33 @@ import { supabase } from '@/lib/supabase/client'
 import { ensureUserExistsInAuth } from '@/lib/supabase/auth'
 import { useRouter } from 'next/navigation'
 
+/**
+ * Determine the correct post-login destination based on author status.
+ * Runs after auth succeeds so the user lands on the right page immediately
+ * — no flash of dashboard before redirect.
+ */
+async function resolvePostLoginRoute(userEmail: string): Promise<string> {
+  const { data: authorData } = await supabase
+    .from('authors')
+    .select('is_first_login, application_status')
+    .eq('author_email', userEmail)
+    .maybeSingle()
+
+  // No author row — brand new user
+  if (!authorData) return '/onboarding'
+
+  // Has row but hasn't completed profile yet
+  if (authorData.is_first_login) return '/onboarding'
+
+  // Completed profile but not yet approved
+  if (authorData.application_status !== 'approved') {
+    return `/application-status?status=${authorData.application_status || 'pending'}`
+  }
+
+  // Approved author — go to dashboard
+  return '/dashboard'
+}
+
 export function LoginForm() {
   const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
@@ -37,7 +64,8 @@ export function LoginForm() {
       }
 
       if (data.user) {
-        router.push('/dashboard')
+        const dest = await resolvePostLoginRoute(email.trim().toLowerCase())
+        router.push(dest)
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')
@@ -97,7 +125,8 @@ export function LoginForm() {
 
       if (isHardcodedOTP) {
         // Bypass verification for hardcoded OTP
-        router.push('/dashboard')
+        const dest = await resolvePostLoginRoute(userEmail)
+        router.push(dest)
         return
       }
 
@@ -114,7 +143,8 @@ export function LoginForm() {
       }
 
       if (data.user) {
-        router.push('/dashboard')
+        const dest = await resolvePostLoginRoute(userEmail)
+        router.push(dest)
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')

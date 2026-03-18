@@ -10,11 +10,17 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
-import { Camera, ImageIcon, Loader2, User, Eye, Target, BookOpen } from 'lucide-react'
+import { Camera, ImageIcon, Loader2, User, Eye, Target, BookOpen, Check, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const AVATAR_BUCKET = 'author-avatars'
 const COVER_BUCKET = 'author-covers'
+
+const PRINCIPLES = [
+  'My content is human-made. I maintain editorial control over everything I publish.',
+  'I cite sources and link out when referencing facts or claims.',
+  'I don\'t publish content designed to mislead, rage-bait, or exploit.',
+]
 
 interface FormData {
   author_first_name: string
@@ -59,6 +65,11 @@ function OnboardingContent() {
   const [submitting, setSubmitting] = useState(false)
   const [isFirstLogin, setIsFirstLogin] = useState(true)
   const [isNewUser, setIsNewUser] = useState(false)
+  const [step, setStep] = useState<'principles' | 'profile'>('principles')
+  const [principlesAccepted, setPrinciplesAccepted] = useState<boolean[]>([false, false, false])
+  const allPrinciplesAccepted = principlesAccepted.every(Boolean)
+  const [disclosures, setDisclosures] = useState('')
+  const [principlesError, setPrinciplesError] = useState<string | null>(null)
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
@@ -141,14 +152,21 @@ function OnboardingContent() {
             setCoverPreview(authorData.author_cover)
           }
 
+          // Edit mode or pre-added author — skip principles, go straight to profile
+          if (isEditMode || authorData.is_first_login) {
+            setStep('profile')
+            setPrinciplesAccepted([true, true, true])
+          }
+
           // Fetch stats when in edit mode
           if (isEditMode) {
             fetchAuthorStats(authorData.id)
           }
         } else {
-          // No author record — brand new user
+          // No author record — brand new user, start at principles
           setIsNewUser(true)
           setIsFirstLogin(true)
+          setStep('principles')
         }
       }
     } catch (error) {
@@ -426,6 +444,129 @@ function OnboardingContent() {
     )
   }
 
+  // ── Principles Step (new users only, not edit mode) ──────────────────
+  if (step === 'principles' && !isEditMode) {
+    const handlePrinciplesContinue = () => {
+      if (!allPrinciplesAccepted) {
+        setPrinciplesError('Please agree to all three principles to continue.')
+        return
+      }
+      setPrinciplesError(null)
+      setStep('profile')
+    }
+
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b border-border bg-card">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+            <Logo width={64} height={64} />
+            <ThemeToggle />
+          </div>
+        </header>
+
+        <main className="container mx-auto px-4 py-8 max-w-2xl">
+          {/* Progress bar — step 1 of 2 */}
+          <div className="flex gap-2 mb-8">
+            <div className="h-1 flex-1 rounded-full bg-primary" />
+            <div className="h-1 flex-1 rounded-full bg-muted" />
+          </div>
+
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-foreground mb-2">
+              The Principles
+            </h1>
+            <p className="text-muted-foreground">
+              Newsreel is a network for humans on the internet. We take this seriously.
+            </p>
+          </div>
+
+          <Card className="p-6 space-y-6">
+            {/* Principle checkboxes */}
+            <div className="space-y-3">
+              {PRINCIPLES.map((principle, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => {
+                    const next = [...principlesAccepted]
+                    next[i] = !next[i]
+                    setPrinciplesAccepted(next)
+                    setPrinciplesError(null)
+                  }}
+                  className={cn(
+                    'flex gap-4 items-start w-full p-4 rounded-lg border transition-all text-left',
+                    principlesAccepted[i]
+                      ? 'bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30'
+                      : 'bg-card border-border hover:border-muted-foreground'
+                  )}
+                >
+                  <div className={cn(
+                    'w-6 h-6 rounded flex items-center justify-center flex-shrink-0 mt-0.5 transition-all',
+                    principlesAccepted[i]
+                      ? 'bg-primary'
+                      : 'border border-muted-foreground'
+                  )}>
+                    {principlesAccepted[i] && <Check className="h-3.5 w-3.5 text-primary-foreground" />}
+                  </div>
+                  <p className={cn(
+                    'text-sm leading-relaxed',
+                    principlesAccepted[i] ? 'text-foreground' : 'text-muted-foreground'
+                  )}>
+                    {principle}
+                  </p>
+                </button>
+              ))}
+            </div>
+
+            {principlesError && (
+              <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                {principlesError}
+              </div>
+            )}
+
+            {allPrinciplesAccepted && (
+              <p className="text-sm font-medium text-success flex items-center gap-2">
+                <Check className="h-4 w-4" /> All principles accepted
+              </p>
+            )}
+
+            {/* Separator */}
+            <div className="border-t border-border" />
+
+            {/* Disclosures */}
+            <div>
+              <Label htmlFor="disclosures">
+                Disclosures <span className="text-muted-foreground font-normal">(optional but encouraged)</span>
+              </Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                Political affiliations, funding sources, or anything your readers should know. This shows on your profile.
+              </p>
+              <Input
+                id="disclosures"
+                value={disclosures}
+                onChange={(e) => setDisclosures(e.target.value)}
+                placeholder="e.g. Registered Democrat, funded by Knight Foundation, none"
+              />
+            </div>
+
+            {/* Continue button */}
+            <div className="pt-2">
+              <Button
+                onClick={handlePrinciplesContinue}
+                className="w-full"
+                size="lg"
+              >
+                Continue
+                <ArrowRight className="h-4 w-4 ml-2" />
+              </Button>
+            </div>
+          </Card>
+        </main>
+      </div>
+    )
+  }
+
+  // ── Profile Step ────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -440,6 +581,14 @@ function OnboardingContent() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8 max-w-2xl">
+        {/* Progress bar — step 2 of 2 (only for new/first-login users, not edit mode) */}
+        {(isNewUser || isFirstLogin) && !isEditMode && (
+          <div className="flex gap-2 mb-8">
+            <div className="h-1 flex-1 rounded-full bg-primary" />
+            <div className="h-1 flex-1 rounded-full bg-primary" />
+          </div>
+        )}
+
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">
             {isNewUser ? 'Apply to Contribute' : isFirstLogin ? 'Welcome to Newsreel' : 'Edit Your Profile'}
@@ -737,6 +886,17 @@ function OnboardingContent() {
 
             {/* Submit Button */}
             <div className="pt-6 flex gap-3">
+              {isNewUser && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep('principles')}
+                  className="w-full"
+                  size="lg"
+                >
+                  Back
+                </Button>
+              )}
               {isEditMode && (
                 <Button
                   type="button"
