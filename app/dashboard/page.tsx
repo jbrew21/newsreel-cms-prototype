@@ -6,10 +6,11 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2 } from 'lucide-react'
+import { Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, BarChart3 } from 'lucide-react'
 import { deleteStory } from '@/lib/supabase/brief'
 import { cn } from '@/lib/utils'
 import { Sidebar, MobileHeader, TabContent, type TabId } from '@/components/dashboard'
+import { AnalyticsDashboard } from '@/components/analytics'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -467,7 +468,8 @@ export default function DashboardPage() {
   const navItems = [
     { id: 'drafts' as TabId, label: 'Drafts', count: draftContent.length },
     { id: 'published' as TabId, label: 'Published', count: publishedContent.length },
-    { id: 'all' as TabId, label: 'All Stories', icon: <Users className="h-3.5 w-3.5" />, visible: isInternalTeam },
+    { id: 'all' as TabId, label: 'All', visible: isInternalTeam },
+    { id: 'analytics' as TabId, label: 'Analytics', icon: <BarChart3 className="h-3.5 w-3.5" /> },
   ]
 
   const greeting = getGreeting()
@@ -676,6 +678,16 @@ export default function DashboardPage() {
                   </Card>
                 ))}
               </div>
+            )}
+          </TabContent>
+
+          {/* ── Analytics Tab ──────────────────────────────────────── */}
+          <TabContent id="analytics" active={activeTab === 'analytics'}>
+            {author && (
+              <AnalyticsDashboard
+                authorId={author.id}
+                authorName={getAuthorName()}
+              />
             )}
           </TabContent>
 

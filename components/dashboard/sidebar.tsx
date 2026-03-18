@@ -1,14 +1,14 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Plus, LogOut, Users, Pencil } from 'lucide-react'
+import { Plus, LogOut, Users, Pencil, FileText, BarChart3, ChevronDown } from 'lucide-react'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type TabId = 'drafts' | 'published' | 'all'
+export type TabId = 'drafts' | 'published' | 'all' | 'analytics'
 
 export interface NavItem {
   id: TabId
@@ -98,33 +98,87 @@ export function Sidebar({
           </button>
         </div>
 
-        {/* Navigation tabs */}
-        <nav className="flex-1 px-3 space-y-1">
-          {navItems
-            .filter(item => item.visible !== false)
-            .map(item => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  onTabChange(item.id)
-                  onClose()
-                }}
-                className={cn(
-                  'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all duration-200',
-                  activeTab === item.id
-                    ? 'bg-accent text-accent-foreground font-medium'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-                )}
-              >
-                <span className="flex items-center gap-2">
-                  {item.icon}
-                  {item.label}
-                </span>
-                {item.count !== undefined && item.count > 0 && (
-                  <span className="text-xs text-muted-foreground">{item.count}</span>
-                )}
-              </button>
-            ))}
+        {/* Navigation */}
+        <nav className="flex-1 px-3 pt-1 space-y-1">
+          {/* Stories — top-level tab with sub-tabs */}
+          {(() => {
+            const isStoriesActive = activeTab === 'drafts' || activeTab === 'published' || activeTab === 'all'
+            const storySubItems = navItems.filter(item => item.id !== 'analytics' && item.visible !== false)
+
+            return (
+              <div>
+                <button
+                  onClick={() => {
+                    if (!isStoriesActive) {
+                      onTabChange('drafts')
+                      onClose()
+                    }
+                  }}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all duration-200',
+                    isStoriesActive
+                      ? 'text-foreground font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <FileText className="h-3.5 w-3.5" />
+                    Stories
+                  </span>
+                  <ChevronDown className={cn(
+                    'h-3 w-3 text-muted-foreground transition-transform duration-200',
+                    isStoriesActive ? 'rotate-0' : '-rotate-90'
+                  )} />
+                </button>
+
+                {/* Sub-tabs — visible when Stories is active */}
+                <div className={cn(
+                  'overflow-hidden transition-all duration-200',
+                  isStoriesActive ? 'max-h-40 opacity-100 mt-0.5' : 'max-h-0 opacity-0'
+                )}>
+                  <div className="ml-3 pl-3 border-l border-border/50 space-y-0.5">
+                    {storySubItems.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          onTabChange(item.id)
+                          onClose()
+                        }}
+                        className={cn(
+                          'w-full flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-all duration-200',
+                          activeTab === item.id
+                            ? 'bg-accent text-accent-foreground font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                        )}
+                      >
+                        <span>{item.label}</span>
+                        {item.count !== undefined && item.count > 0 && (
+                          <span className="text-xs text-muted-foreground">{item.count}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Analytics — top-level tab */}
+          <button
+            onClick={() => {
+              onTabChange('analytics')
+              onClose()
+            }}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-all duration-200',
+              activeTab === 'analytics'
+                ? 'bg-accent text-accent-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+            )}
+          >
+            <BarChart3 className="h-3.5 w-3.5" />
+            Analytics
+          </button>
         </nav>
 
         {/* Bottom: Author + Sign out */}
