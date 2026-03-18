@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase/client'
-import { checkAuthorExists } from '@/lib/supabase/auth'
+import { ensureUserExistsInAuth } from '@/lib/supabase/auth'
 import { useRouter } from 'next/navigation'
 
 export function LoginForm() {
@@ -25,16 +25,8 @@ export function LoginForm() {
     setError(null)
 
     try {
-      const { exists, authorEmail } = await checkAuthorExists(email)
-
-      if (!exists || !authorEmail) {
-        setError('No account found with this email address.')
-        setIsLoading(false)
-        return
-      }
-
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: authorEmail,
+        email: email.trim().toLowerCase(),
         password,
       })
 
@@ -60,18 +52,20 @@ export function LoginForm() {
     setError(null)
 
     try {
-      const { exists, authorEmail } = await checkAuthorExists(email)
+      const normalizedEmail = email.trim().toLowerCase()
 
-      if (!exists || !authorEmail) {
-        setError('No account found with this email address.')
+      // Ensure user exists in Supabase Auth (creates if new)
+      const { success, error: authError } = await ensureUserExistsInAuth(normalizedEmail)
+      if (!success) {
+        setError(authError || 'Failed to prepare your account. Please try again.')
         setIsLoading(false)
         return
       }
 
-      setUserEmail(authorEmail)
+      setUserEmail(normalizedEmail)
 
       const { error: otpError } = await supabase.auth.signInWithOtp({
-        email: authorEmail,
+        email: normalizedEmail,
         options: {
           shouldCreateUser: true,
         },

@@ -108,21 +108,33 @@ export default function DashboardPage() {
           .eq('author_email', user.email)
           .maybeSingle()
 
-        if (!error && authorData) {
-          if (authorData.is_first_login) {
-            router.push('/onboarding')
-            return
-          }
-          setAuthor(authorData)
+        // No author record yet — new user, send to onboarding
+        if (!authorData || error) {
+          router.push('/onboarding')
+          return
+        }
 
-          const internal = user.email?.endsWith('@newsreel.co') ?? false
-          setIsInternalTeam(internal)
+        // First login — still need to complete profile
+        if (authorData.is_first_login) {
+          router.push('/onboarding')
+          return
+        }
 
-          await fetchAuthorContent(authorData.id)
+        // Application not yet approved — show status page
+        if (authorData.application_status !== 'approved') {
+          router.push(`/application-status?status=${authorData.application_status || 'pending'}`)
+          return
+        }
 
-          if (internal) {
-            await fetchAllStories()
-          }
+        setAuthor(authorData)
+
+        const internal = user.email?.endsWith('@newsreel.co') ?? false
+        setIsInternalTeam(internal)
+
+        await fetchAuthorContent(authorData.id)
+
+        if (internal) {
+          await fetchAllStories()
         }
       }
     } catch (error) {

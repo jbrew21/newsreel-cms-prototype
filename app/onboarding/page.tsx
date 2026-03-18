@@ -58,6 +58,7 @@ function OnboardingContent() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [isFirstLogin, setIsFirstLogin] = useState(true)
+  const [isNewUser, setIsNewUser] = useState(false)
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
@@ -102,7 +103,6 @@ function OnboardingContent() {
       }
       setUser(user)
 
-      // Check if author exists and if it's first login
       if (user.email) {
         const { data: authorData, error } = await supabase
           .from('authors')
@@ -111,12 +111,18 @@ function OnboardingContent() {
           .maybeSingle()
 
         if (!error && authorData) {
-          // If not first login and not in edit mode, redirect to dashboard
-          if (!authorData.is_first_login && !isEditMode) {
+          // Approved author who completed profile and not in edit mode → dashboard
+          if (!authorData.is_first_login && authorData.application_status === 'approved' && !isEditMode) {
             router.push('/dashboard')
             return
           }
+          // Pending/rejected author who already submitted → show status page
+          if (!authorData.is_first_login && authorData.application_status !== 'approved' && !isEditMode) {
+            router.push(`/application-status?status=${authorData.application_status || 'pending'}`)
+            return
+          }
           setIsFirstLogin(authorData.is_first_login ?? true)
+          setIsNewUser(false)
           setAuthorId(authorData.id)
           // Pre-fill any existing data
           setFormData({
@@ -139,6 +145,10 @@ function OnboardingContent() {
           if (isEditMode) {
             fetchAuthorStats(authorData.id)
           }
+        } else {
+          // No author record — brand new user
+          setIsNewUser(true)
+          setIsFirstLogin(true)
         }
       }
     } catch (error) {
@@ -291,7 +301,9 @@ function OnboardingContent() {
   }
 
   const handleSubmit = async () => {
-    if (!validateForm() || !authorId || !user?.email) return
+    if (!validateForm() || !user?.email) return
+    // Existing authors (edit mode) need an authorId
+    if (!isNewUser && !authorId) return
 
     setSubmitting(true)
 
@@ -300,12 +312,10 @@ function OnboardingContent() {
 
       // Upload avatar if new file selected
       if (avatarFile) {
-        // Use email as filename (sanitize it)
         const sanitizedEmail = user.email.replace(/[^a-zA-Z0-9]/g, '_')
         const fileExt = avatarFile.name.split('.').pop()?.toLowerCase() || 'jpg'
         const avatarPath = `${sanitizedEmail}.${fileExt}`
 
-        // Upload to author-avatars bucket
         const { error: uploadError } = await supabase.storage
           .from(AVATAR_BUCKET)
           .upload(avatarPath, avatarFile, { upsert: true })
@@ -314,7 +324,6 @@ function OnboardingContent() {
           throw new Error(`Failed to upload avatar: ${uploadError.message}`)
         }
 
-        // Get public URL
         const { data: urlData } = supabase.storage
           .from(AVATAR_BUCKET)
           .getPublicUrl(avatarPath)
@@ -345,30 +354,61 @@ function OnboardingContent() {
         coverUrl = urlData.publicUrl
       }
 
-      // Update author record
-      const { error: updateError } = await supabase
-        .from('authors')
-        .update({
-          author_first_name: formData.author_first_name.trim(),
-          author_last_name: formData.author_last_name.trim(),
-          author_bio: formData.author_bio.trim(),
-          author_role: formData.author_role.trim(),
-          author_organization: formData.author_organization.trim(),
-          author_twitter: formData.author_twitter.trim() || null,
-          author_linked_in: formData.author_linked_in.trim() || null,
-          author_avatar: avatarUrl,
-          author_cover: coverUrl,
-          is_first_login: false,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', authorId)
-
-      if (updateError) {
-        throw new Error(`Failed to update profile: ${updateError.message}`)
+      const profilePayload = {
+        author_first_name: formData.author_first_name.trim(),
+        author_last_name: formData.author_last_name.trim(),
+        author_bio: formData.author_bio.trim(),
+        author_role: formData.author_role.trim(),
+        author_organization: formData.author_organization.trim(),
+        author_twitter: formData.author_twitter.trim() || null,
+        author_linked_in: formData.author_linked_in.trim() || null,
+        author_avatar: avatarUrl,
+        author_cover: coverUrl,
+        is_first_login: false,
+        updated_at: new Date().toISOString(),
       }
 
-      // Redirect to dashboard
-      router.push('/dashboard')
+      if (isNewUser) {
+        // New user — create author row with pending status
+        const { error: insertError } = await supabase
+          .from('authors')
+          .insert({
+            ...profilePayload,
+            author_email: user.email,
+            application_status: 'pending',
+          })
+
+        if (insertError) {
+          throw new Error(`Failed to create profile: ${insertError.message}`)
+        }
+
+        // New applicant → show pending status page
+        router.push('/application-status?status=pending')
+      } else if (isEditMode) {
+        // Existing author editing profile — keep their current status
+        const { error: updateError } = await supabase
+          .from('authors')
+          .update(profilePayload)
+          .eq('id', authorId)
+
+        if (updateError) {
+          throw new Error(`Failed to update profile: ${updateError.message}`)
+        }
+
+        router.push('/dashboard')
+      } else {
+        // Existing author row (pre-added by admin) completing first login
+        const { error: updateError } = await supabase
+          .from('authors')
+          .update(profilePayload)
+          .eq('id', authorId)
+
+        if (updateError) {
+          throw new Error(`Failed to update profile: ${updateError.message}`)
+        }
+
+        router.push('/dashboard')
+      }
 
     } catch (error) {
       console.error('Error saving profile:', error)
@@ -402,10 +442,12 @@ function OnboardingContent() {
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-foreground mb-2">
-            {isFirstLogin ? 'Welcome to Newsreel' : 'Edit Your Profile'}
+            {isNewUser ? 'Apply to Contribute' : isFirstLogin ? 'Welcome to Newsreel' : 'Edit Your Profile'}
           </h1>
           <p className="text-muted-foreground">
-            {isFirstLogin
+            {isNewUser
+              ? "Complete your profile to apply as a Newsreel contributor. Our team will review your application."
+              : isFirstLogin
               ? "Let's set up your author profile before you start creating stories."
               : 'Update your author profile information.'}
           </p>
@@ -715,8 +757,10 @@ function OnboardingContent() {
                 {submitting ? (
                   <>
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
+                    {isNewUser ? 'Submitting Application...' : 'Saving...'}
                   </>
+                ) : isNewUser ? (
+                  'Submit Application'
                 ) : isFirstLogin ? (
                   'Complete Profile & Continue'
                 ) : (

@@ -1,18 +1,21 @@
 import { supabase } from './client'
 
+export type ApplicationStatus = 'pending' | 'approved' | 'rejected'
+
 /**
  * Check if an author exists with the given email
- * Returns the exact email from database (case-insensitive search)
+ * Returns the exact email from database (case-insensitive search) and application status
  */
 export async function checkAuthorExists(email: string): Promise<{
   exists: boolean
   authorEmail: string | null
+  applicationStatus: ApplicationStatus | null
 }> {
   try {
     // First try exact match
     const { data: exactMatch, error: exactError } = await supabase
       .from('authors')
-      .select('author_email')
+      .select('author_email, application_status')
       .eq('author_email', email)
       .maybeSingle()
 
@@ -20,13 +23,14 @@ export async function checkAuthorExists(email: string): Promise<{
       return {
         exists: true,
         authorEmail: exactMatch.author_email,
+        applicationStatus: exactMatch.application_status as ApplicationStatus,
       }
     }
 
     // Fallback to case-insensitive search
     const { data: caseInsensitive, error: caseError } = await supabase
       .from('authors')
-      .select('author_email')
+      .select('author_email, application_status')
       .ilike('author_email', email)
       .maybeSingle()
 
@@ -34,17 +38,20 @@ export async function checkAuthorExists(email: string): Promise<{
       return {
         exists: true,
         authorEmail: caseInsensitive.author_email,
+        applicationStatus: caseInsensitive.application_status as ApplicationStatus,
       }
     }
 
     return {
       exists: false,
       authorEmail: null,
+      applicationStatus: null,
     }
   } catch (error) {
     return {
       exists: false,
       authorEmail: null,
+      applicationStatus: null,
     }
   }
 }
