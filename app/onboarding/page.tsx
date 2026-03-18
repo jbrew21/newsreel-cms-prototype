@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
-import { Camera, ImageIcon, Loader2, User } from 'lucide-react'
+import { Camera, ImageIcon, Loader2, User, Eye, Target, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const AVATAR_BUCKET = 'author-avatars'
@@ -77,6 +77,11 @@ function OnboardingContent() {
 
   const [errors, setErrors] = useState<FormErrors>({})
 
+  // Stats (edit mode only)
+  const [monthlyReaders, setMonthlyReaders] = useState(0)
+  const [quizAccuracy, setQuizAccuracy] = useState<number | null>(null)
+  const [totalPublished, setTotalPublished] = useState(0)
+
   // Password change state (edit mode only)
   const [newPassword, setNewPassword] = useState('')
   const [confirmNewPassword, setConfirmNewPassword] = useState('')
@@ -129,6 +134,11 @@ function OnboardingContent() {
           if (authorData.author_cover) {
             setCoverPreview(authorData.author_cover)
           }
+
+          // Fetch stats when in edit mode
+          if (isEditMode) {
+            fetchAuthorStats(authorData.id)
+          }
         }
       }
     } catch (error) {
@@ -136,6 +146,35 @@ function OnboardingContent() {
       router.push('/')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchAuthorStats = async (authorId: string) => {
+    try {
+      const { data: storyLinks } = await supabase
+        .from('authors_stories_links')
+        .select('story_id')
+        .eq('author_id', authorId)
+
+      if (storyLinks && storyLinks.length > 0) {
+        const storyIds = storyLinks.map(link => link.story_id)
+        const now = new Date()
+        const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+        const next = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+        const monthEnd = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, '0')}-01`
+
+        const [readersRes, accuracyRes, storiesRes] = await Promise.all([
+          supabase.rpc('get_author_monthly_readers', { story_ids: storyIds, month_start: monthStart, month_end: monthEnd }),
+          supabase.rpc('get_author_quiz_accuracy', { story_ids: storyIds }),
+          supabase.from('stories').select('id, published_at').in('id', storyIds),
+        ])
+
+        if (typeof readersRes.data === 'number') setMonthlyReaders(readersRes.data)
+        if (accuracyRes.data !== null && accuracyRes.data !== undefined) setQuizAccuracy(Number(accuracyRes.data))
+        if (storiesRes.data) setTotalPublished(storiesRes.data.filter((s: any) => s.published_at).length)
+      }
+    } catch (error) {
+      console.error('Error fetching author stats:', error)
     }
   }
 
@@ -562,6 +601,36 @@ function OnboardingContent() {
                 </div>
               </div>
             </div>
+
+            {/* Author Stats (edit mode only) */}
+            {isEditMode && (monthlyReaders > 0 || totalPublished > 0 || (quizAccuracy !== null && quizAccuracy > 0)) && (
+              <div className="pt-4 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-4">Your Stats</p>
+                <div className="grid grid-cols-3 gap-3">
+                  {monthlyReaders > 0 && (
+                    <div className="bg-muted/50 rounded-xl p-4 text-center">
+                      <Eye className="h-4 w-4 text-primary mx-auto mb-2" />
+                      <p className="text-foreground text-lg font-medium">{monthlyReaders.toLocaleString()}</p>
+                      <p className="text-muted-foreground text-[11px]">readers/mo</p>
+                    </div>
+                  )}
+                  {totalPublished > 0 && (
+                    <div className="bg-muted/50 rounded-xl p-4 text-center">
+                      <BookOpen className="h-4 w-4 text-primary mx-auto mb-2" />
+                      <p className="text-foreground text-lg font-medium">{totalPublished}</p>
+                      <p className="text-muted-foreground text-[11px]">published</p>
+                    </div>
+                  )}
+                  {quizAccuracy !== null && quizAccuracy > 0 && (
+                    <div className="bg-muted/50 rounded-xl p-4 text-center">
+                      <Target className="h-4 w-4 text-primary mx-auto mb-2" />
+                      <p className="text-foreground text-lg font-medium">{Math.round(quizAccuracy)}%</p>
+                      <p className="text-muted-foreground text-[11px]">quiz accuracy</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Change Password (edit mode only) */}
             {isEditMode && (
