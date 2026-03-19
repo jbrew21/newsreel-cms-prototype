@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video, ChevronDown, Camera } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
 import type { SlideFormData, BriefFormData, QuizFormData, PollFormData, EditBriefMetadata } from '@/lib/supabase/types'
@@ -18,6 +18,8 @@ import { MediaPickerModal } from '@/components/media-picker-modal'
 import { MediaSearchModal } from '@/components/media-search-modal'
 import type { MediaItem } from '@/lib/media-search/types'
 import { AIStoryGenerator } from '@/components/ai-story-generator'
+import { BackgroundSelectorModal, VideoRecorderModal, AuthorVideoPreview } from '@/components/video-recorder'
+import type { BackgroundConfig } from '@/hooks/use-video-compositor'
 
 interface Author {
   id: string
@@ -96,6 +98,20 @@ export default function CreateContentPage() {
   const [mediaSearchSlideId, setMediaSearchSlideId] = useState<string | null>(null)
   const [coverPickerOpen, setCoverPickerOpen] = useState(false)
   const [coverSearchOpen, setCoverSearchOpen] = useState(false)
+
+  // Video recorder state
+  const [bgSelectorSlideId, setBgSelectorSlideId] = useState<string | null>(null)
+  const [recorderSlideId, setRecorderSlideId] = useState<string | null>(null)
+  const [recorderBackground, setRecorderBackground] = useState<BackgroundConfig>({ type: 'none' })
+  const [authorVideos, setAuthorVideos] = useState<Map<string, { file: File; previewUrl: string }>>(new Map())
+  const [bgSearchSlideId, setBgSearchSlideId] = useState<string | null>(null)
+
+  // Story headline video recorder state
+  const [storyHeadlineBgSelectorOpen, setStoryHeadlineBgSelectorOpen] = useState(false)
+  const [storyHeadlineBgSearchOpen, setStoryHeadlineBgSearchOpen] = useState(false)
+  const [storyHeadlineRecorderOpen, setStoryHeadlineRecorderOpen] = useState(false)
+  const [storyHeadlineRecorderBackground, setStoryHeadlineRecorderBackground] = useState<BackgroundConfig>({ type: 'none' })
+  const [storyHeadlineVideo, setStoryHeadlineVideo] = useState<{ file: File; previewUrl: string } | null>(null)
 
   // Back confirmation modal
   const [showBackConfirm, setShowBackConfirm] = useState(false)
@@ -236,8 +252,15 @@ export default function CreateContentPage() {
 
       // Restore headline photo preview from window global
       if (window.__briefMediaFiles?.headlinePhoto) {
-        const url = URL.createObjectURL(window.__briefMediaFiles.headlinePhoto)
-        setHeadlinePhotoPreview(url)
+        const file = window.__briefMediaFiles.headlinePhoto
+        // Check if it's a video file (recorded video)
+        if (file.type.startsWith('video/')) {
+          const url = URL.createObjectURL(file)
+          setStoryHeadlineVideo({ file, previewUrl: url })
+        } else {
+          const url = URL.createObjectURL(file)
+          setHeadlinePhotoPreview(url)
+        }
       } else if (parsed.headlinePhotoUrl) {
         setHeadlinePhotoPreview(parsed.headlinePhotoUrl)
       }
@@ -415,6 +438,130 @@ export default function CreateContentPage() {
       window.__briefMediaFiles.headlinePhoto = null
     }
     setCoverSearchOpen(false)
+  }
+
+  // Video recorder handlers
+  const handleBgSelected = (slideId: string, config: BackgroundConfig) => {
+    setRecorderBackground(config)
+    setBgSelectorSlideId(null)
+    setTimeout(() => setRecorderSlideId(slideId), 150)
+  }
+
+  const handleBgSearchMediaSelect = (slideId: string, item: MediaItem) => {
+    const isVideo = item.mediaType === 'video'
+    const config: BackgroundConfig = isVideo
+      ? { type: 'video', src: item.url }
+      : { type: 'image', src: item.url }
+    handleBgSelected(slideId, config)
+    setBgSearchSlideId(null)
+  }
+
+  const handleStoryHeadlineBgSearchMediaSelect = (item: MediaItem) => {
+    const isVideo = item.mediaType === 'video'
+    const config: BackgroundConfig = isVideo
+      ? { type: 'video', src: item.url }
+      : { type: 'image', src: item.url }
+    setStoryHeadlineRecorderBackground(config)
+    setStoryHeadlineBgSearchOpen(false)
+    setTimeout(() => setStoryHeadlineRecorderOpen(true), 150)
+  }
+
+  const handleRecordingComplete = (slideId: string, file: File) => {
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file)
+
+    // Revoke old preview if exists
+    const old = authorVideos.get(slideId)
+    if (old) URL.revokeObjectURL(old.previewUrl)
+
+    // Store the video
+    setAuthorVideos(prev => {
+      const next = new Map(prev)
+      next.set(slideId, { file, previewUrl })
+      return next
+    })
+
+    // Store in global file storage — the recorded video replaces slide media
+    if (window.__briefMediaFiles) {
+      window.__briefMediaFiles.slideMedia.set(slideId, [file])
+    }
+
+    // Update slide form data — mark as portrait video, clear other media
+    handleSlideChange(slideId, 'portrait_video', true)
+    handleSlideChange(slideId, 'mediaFiles', [file])
+    handleSlideChange(slideId, 'savedMediaUrls', [])
+    handleSlideChange(slideId, 'existingMediaUrls', [])
+
+    // Update slide media preview
+    const oldUrls = slideMediaPreviews.get(slideId)
+    if (oldUrls) oldUrls.forEach(url => URL.revokeObjectURL(url))
+    setSlideMediaPreviews(prev => {
+      const newMap = new Map(prev)
+      newMap.delete(slideId) // Let AuthorVideoPreview handle display
+      return newMap
+    })
+  }
+
+  const handleDeleteRecording = (slideId: string) => {
+    const recording = authorVideos.get(slideId)
+    if (recording) {
+      URL.revokeObjectURL(recording.previewUrl)
+    }
+    setAuthorVideos(prev => {
+      const next = new Map(prev)
+      next.delete(slideId)
+      return next
+    })
+
+    // Clear from global storage and form data
+    if (window.__briefMediaFiles) {
+      window.__briefMediaFiles.slideMedia.delete(slideId)
+    }
+    handleSlideChange(slideId, 'portrait_video', false)
+    handleSlideChange(slideId, 'mediaFiles', [])
+  }
+
+  const handleStoryHeadlineRecordingComplete = (file: File) => {
+    // Create preview URL
+    const previewUrl = URL.createObjectURL(file)
+
+    // Revoke old preview if exists
+    if (storyHeadlineVideo) {
+      URL.revokeObjectURL(storyHeadlineVideo.previewUrl)
+    }
+
+    // Store the video
+    setStoryHeadlineVideo({ file, previewUrl })
+
+    // Store in global file storage
+    if (window.__briefMediaFiles) {
+      window.__briefMediaFiles.headlinePhoto = file
+    }
+
+    // Update form data
+    setStoryData(prev => ({
+      ...prev,
+      headlinePhoto: file,
+    }))
+
+    // Close recorder modal
+    setStoryHeadlineRecorderOpen(false)
+  }
+
+  const handleDeleteStoryHeadlineRecording = () => {
+    if (storyHeadlineVideo) {
+      URL.revokeObjectURL(storyHeadlineVideo.previewUrl)
+    }
+    setStoryHeadlineVideo(null)
+
+    // Clear from global storage and form data
+    if (window.__briefMediaFiles) {
+      window.__briefMediaFiles.headlinePhoto = null
+    }
+    setStoryData(prev => ({
+      ...prev,
+      headlinePhoto: null,
+    }))
   }
 
   const isVideoFile = (file: File): boolean => {
@@ -689,6 +836,15 @@ export default function CreateContentPage() {
                       >
                         Choose Media
                       </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setStoryHeadlineBgSelectorOpen(true)}
+                        className="bg-background"
+                      >
+                        <Camera className="h-4 w-4 mr-1.5" />
+                        Record Video
+                      </Button>
                       <input
                         id="headline-photo-input"
                         type="file"
@@ -697,15 +853,17 @@ export default function CreateContentPage() {
                         onChange={(e) => setStoryData(prev => ({ ...prev, headlinePhoto: e.target.files?.[0] || null, headlinePhotoUrl: undefined }))}
                       />
                       <span className="text-sm text-muted-foreground">
-                        {storyData.headlinePhoto
-                          ? storyData.headlinePhoto.name
-                          : storyData.headlinePhotoUrl
-                            ? 'Current cover media'
-                            : 'No file chosen'}
+                        {storyHeadlineVideo
+                          ? 'Video recorded'
+                          : storyData.headlinePhoto
+                            ? storyData.headlinePhoto.name
+                            : storyData.headlinePhotoUrl
+                              ? 'Current cover media'
+                              : 'No file chosen'}
                       </span>
                     </div>
-                    {/* Headline Photo/Video Preview - new file or existing URL */}
-                    {(headlinePhotoPreview || (storyData.headlinePhotoUrl && !storyData.headlinePhoto)) && (
+                    {/* Headline Photo/Video Preview - new file or existing URL (but not if recording exists) */}
+                    {!storyHeadlineVideo && (headlinePhotoPreview || (storyData.headlinePhotoUrl && !storyData.headlinePhoto)) && (
                       <div className="relative w-full max-w-xs">
                         {/* Check if it's a video - either from File type or URL pattern */}
                         {(storyData.headlinePhoto?.type.startsWith('video/') ||
@@ -746,6 +904,36 @@ export default function CreateContentPage() {
                             <X className="h-4 w-4 text-muted-foreground" />
                           </button>
                         )}
+                      </div>
+                    )}
+                    {/* Story Headline Video Recording Preview */}
+                    {storyHeadlineVideo && (
+                      <div className="relative w-full max-w-xs">
+                        <div className="relative">
+                          <video
+                            src={storyHeadlineVideo.previewUrl}
+                            className="w-full h-40 object-cover rounded-lg border border-border"
+                            controls={false}
+                            muted
+                            loop
+                            preload="metadata"
+                          />
+                          <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-lg">
+                            <Video className="h-8 w-8 text-white" />
+                          </div>
+                        </div>
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-background/80 rounded text-xs text-muted-foreground flex items-center gap-1">
+                          <Camera className="h-3 w-3" />
+                          Author Recording
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleDeleteStoryHeadlineRecording}
+                          className="absolute top-2 right-2 p-1 bg-background/80 rounded-full hover:bg-background transition-colors"
+                          aria-label="Delete recording"
+                        >
+                          <X className="h-4 w-4 text-muted-foreground" />
+                        </button>
                       </div>
                     )}
                   </div>
@@ -1100,6 +1288,18 @@ export default function CreateContentPage() {
                                 onOpenChange={(open) => setMediaSearchSlideId(open ? slide.id : null)}
                                 onSelectMedia={(item) => handleSearchMediaSelect(slide.id, item)}
                               />
+                              {/* Background selector for video recording */}
+                              <BackgroundSelectorModal
+                                open={bgSelectorSlideId === slide.id}
+                                onOpenChange={(open) => setBgSelectorSlideId(open ? slide.id : null)}
+                                onSelect={(config) => handleBgSelected(slide.id, config)}
+                                onSearchMediaClick={() => setBgSearchSlideId(slide.id)}
+                              />
+                              <MediaSearchModal
+                                open={bgSearchSlideId === slide.id}
+                                onOpenChange={(open) => setBgSearchSlideId(open ? slide.id : null)}
+                                onSelectMedia={(item) => handleBgSearchMediaSelect(slide.id, item)}
+                              />
                               <div className="flex items-center gap-3">
                                 <Button
                                   type="button"
@@ -1109,6 +1309,15 @@ export default function CreateContentPage() {
                                 >
                                   Choose Media
                                 </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={() => setBgSelectorSlideId(slide.id)}
+                                  className="bg-background"
+                                >
+                                  <Camera className="h-4 w-4 mr-1.5" />
+                                  Record Video
+                                </Button>
                                 <input
                                   id={`image-input-${slide.id}`}
                                   type="file"
@@ -1117,13 +1326,15 @@ export default function CreateContentPage() {
                                   onChange={(e) => handleSlideMediaChange(slide.id, e.target.files)}
                                 />
                                 <span className="text-sm text-muted-foreground">
-                                  {slide.mediaFiles.length > 0
-                                    ? `${slide.mediaFiles.length} file${slide.mediaFiles.length > 1 ? 's' : ''} chosen`
-                                    : (slide.savedMediaUrls && slide.savedMediaUrls.length > 0)
-                                      ? 'Current media'
-                                      : (slide.existingMediaUrls && slide.existingMediaUrls.length > 0)
+                                  {authorVideos.has(slide.id)
+                                    ? 'Video recorded'
+                                    : slide.mediaFiles.length > 0
+                                      ? `${slide.mediaFiles.length} file${slide.mediaFiles.length > 1 ? 's' : ''} chosen`
+                                      : (slide.savedMediaUrls && slide.savedMediaUrls.length > 0)
                                         ? 'Current media'
-                                        : 'No file chosen'}
+                                        : (slide.existingMediaUrls && slide.existingMediaUrls.length > 0)
+                                          ? 'Current media'
+                                          : 'No file chosen'}
                                 </span>
                               </div>
                               {/* Existing Media Preview (edit mode or search selection) */}
@@ -1158,8 +1369,15 @@ export default function CreateContentPage() {
                                   </div>
                                 )
                               })}
-                              {/* New File Media Preview */}
-                              {slideMediaPreviews.get(slide.id)?.map((url, idx) => {
+                              {/* Author Video Recording Preview */}
+                              {authorVideos.has(slide.id) && (
+                                <AuthorVideoPreview
+                                  videoUrl={authorVideos.get(slide.id)!.previewUrl}
+                                  onDelete={() => handleDeleteRecording(slide.id)}
+                                />
+                              )}
+                              {/* New File Media Preview (non-recording uploads) */}
+                              {!authorVideos.has(slide.id) && slideMediaPreviews.get(slide.id)?.map((url, idx) => {
                                 const file = slide.mediaFiles[idx]
                                 const isVideo = file && isVideoFile(file)
                                 return (
@@ -1232,6 +1450,45 @@ export default function CreateContentPage() {
                 ))}
               </div>
             </Card>
+
+            {/* Video Recorder Modal (shared across all slides) */}
+            <VideoRecorderModal
+              open={recorderSlideId !== null}
+              onOpenChange={(open) => { if (!open) setRecorderSlideId(null) }}
+              background={recorderBackground}
+              onRecordingComplete={(file) => {
+                if (recorderSlideId) handleRecordingComplete(recorderSlideId, file)
+              }}
+              maxDuration={60}
+            />
+
+            {/* Story Headline Background Selector Modal */}
+            <BackgroundSelectorModal
+              open={storyHeadlineBgSelectorOpen}
+              onOpenChange={setStoryHeadlineBgSelectorOpen}
+              onSelect={(bg) => {
+                setStoryHeadlineRecorderBackground(bg)
+                setStoryHeadlineBgSelectorOpen(false)
+                setTimeout(() => setStoryHeadlineRecorderOpen(true), 150)
+              }}
+              onSearchMediaClick={() => setStoryHeadlineBgSearchOpen(true)}
+            />
+
+            {/* Story Headline Background Search Modal */}
+            <MediaSearchModal
+              open={storyHeadlineBgSearchOpen}
+              onOpenChange={setStoryHeadlineBgSearchOpen}
+              onSelectMedia={handleStoryHeadlineBgSearchMediaSelect}
+            />
+
+            {/* Story Headline Video Recorder Modal */}
+            <VideoRecorderModal
+              open={storyHeadlineRecorderOpen}
+              onOpenChange={(open) => { if (!open) setStoryHeadlineRecorderOpen(false) }}
+              background={storyHeadlineRecorderBackground}
+              onRecordingComplete={handleStoryHeadlineRecordingComplete}
+              maxDuration={60}
+            />
 
             {/* Quiz Slide (Optional) */}
             <Card className="p-6">
