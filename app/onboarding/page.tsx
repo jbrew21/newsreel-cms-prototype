@@ -70,6 +70,7 @@ function OnboardingContent() {
   const allPrinciplesAccepted = principlesAccepted.every(Boolean)
   const [disclosures, setDisclosures] = useState('')
   const [principlesError, setPrinciplesError] = useState<string | null>(null)
+  const [authorType, setAuthorType] = useState<'individual' | 'organization'>('organization')
 
   const [avatarFile, setAvatarFile] = useState<File | null>(null)
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null)
@@ -295,20 +296,28 @@ function OnboardingContent() {
   const validateForm = (): boolean => {
     const newErrors: FormErrors = {}
 
-    if (!formData.author_first_name.trim()) {
-      newErrors.author_first_name = 'First name is required'
+    if (authorType === 'individual') {
+      if (!formData.author_first_name.trim()) {
+        newErrors.author_first_name = 'First name is required'
+      }
+      if (!formData.author_last_name.trim()) {
+        newErrors.author_last_name = 'Last name is required'
+      }
+      if (!formData.author_role.trim()) {
+        newErrors.author_role = 'Role is required'
+      }
+      if (!formData.author_organization.trim()) {
+        newErrors.author_organization = 'Organization is required'
+      }
+    } else {
+      // Organization mode
+      if (!formData.author_first_name.trim()) {
+        newErrors.author_first_name = 'Organization name is required'
+      }
     }
-    if (!formData.author_last_name.trim()) {
-      newErrors.author_last_name = 'Last name is required'
-    }
+
     if (!formData.author_bio.trim()) {
       newErrors.author_bio = 'Bio is required'
-    }
-    if (!formData.author_role.trim()) {
-      newErrors.author_role = 'Role is required'
-    }
-    if (!formData.author_organization.trim()) {
-      newErrors.author_organization = 'Organization is required'
     }
     if (!avatarFile && !avatarPreview) {
       newErrors.avatar = 'Profile photo is required'
@@ -374,10 +383,10 @@ function OnboardingContent() {
 
       const profilePayload = {
         author_first_name: formData.author_first_name.trim(),
-        author_last_name: formData.author_last_name.trim(),
+        author_last_name: authorType === 'organization' ? null : formData.author_last_name.trim(),
         author_bio: formData.author_bio.trim(),
-        author_role: formData.author_role.trim(),
-        author_organization: formData.author_organization.trim(),
+        author_role: authorType === 'organization' ? null : formData.author_role.trim(),
+        author_organization: authorType === 'organization' ? null : formData.author_organization.trim(),
         author_twitter: formData.author_twitter.trim() || null,
         author_linked_in: formData.author_linked_in.trim() || null,
         author_avatar: avatarUrl,
@@ -602,6 +611,42 @@ function OnboardingContent() {
           </p>
         </div>
 
+        {/* Author Type Toggle (only for new users) */}
+        {isNewUser && (
+          <div className="flex gap-3 mb-8 justify-center">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthorType('individual')
+                setFormData(prev => ({ ...prev, author_last_name: '', author_role: '', author_organization: '' }))
+              }}
+              className={cn(
+                'px-6 py-2 rounded-lg font-medium transition-all',
+                authorType === 'individual'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              )}
+            >
+              Individual
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthorType('organization')
+                setFormData(prev => ({ ...prev, author_last_name: '', author_role: '', author_organization: '' }))
+              }}
+              className={cn(
+                'px-6 py-2 rounded-lg font-medium transition-all',
+                authorType === 'organization'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              )}
+            >
+              Organization
+            </button>
+          </div>
+        )}
+
         <Card className="p-6">
           {/* Avatar Upload */}
           <div className="flex flex-col items-center mb-8">
@@ -680,73 +725,93 @@ function OnboardingContent() {
 
           {/* Form Fields */}
           <div className="space-y-6">
-            {/* Name Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Name Row / Organization Name */}
+            {authorType === 'individual' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="first_name">
+                    First Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="first_name"
+                    value={formData.author_first_name}
+                    onChange={(e) => handleInputChange('author_first_name', e.target.value)}
+                    placeholder="John"
+                    className={cn(errors.author_first_name && "border-destructive")}
+                  />
+                  {errors.author_first_name && (
+                    <p className="text-sm text-destructive mt-1">{errors.author_first_name}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="last_name">
+                    Last Name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="last_name"
+                    value={formData.author_last_name}
+                    onChange={(e) => handleInputChange('author_last_name', e.target.value)}
+                    placeholder="Doe"
+                    className={cn(errors.author_last_name && "border-destructive")}
+                  />
+                  {errors.author_last_name && (
+                    <p className="text-sm text-destructive mt-1">{errors.author_last_name}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
               <div>
                 <Label htmlFor="first_name">
-                  First Name <span className="text-destructive">*</span>
+                  Organization Name <span className="text-destructive">*</span>
                 </Label>
                 <Input
                   id="first_name"
                   value={formData.author_first_name}
                   onChange={(e) => handleInputChange('author_first_name', e.target.value)}
-                  placeholder="John"
+                  placeholder="e.g., Mediawise, The New York Times"
                   className={cn(errors.author_first_name && "border-destructive")}
                 />
                 {errors.author_first_name && (
                   <p className="text-sm text-destructive mt-1">{errors.author_first_name}</p>
                 )}
               </div>
-              <div>
-                <Label htmlFor="last_name">
-                  Last Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="last_name"
-                  value={formData.author_last_name}
-                  onChange={(e) => handleInputChange('author_last_name', e.target.value)}
-                  placeholder="Doe"
-                  className={cn(errors.author_last_name && "border-destructive")}
-                />
-                {errors.author_last_name && (
-                  <p className="text-sm text-destructive mt-1">{errors.author_last_name}</p>
-                )}
-              </div>
-            </div>
+            )}
 
-            {/* Role & Organization Row */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="role">
-                  Role <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="role"
-                  value={formData.author_role}
-                  onChange={(e) => handleInputChange('author_role', e.target.value)}
-                  placeholder="Fellow, Editor, Contributor..."
-                  className={cn(errors.author_role && "border-destructive")}
-                />
-                {errors.author_role && (
-                  <p className="text-sm text-destructive mt-1">{errors.author_role}</p>
-                )}
+            {/* Role & Organization Row (Individual Mode Only) */}
+            {authorType === 'individual' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="role">
+                    Role <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="role"
+                    value={formData.author_role}
+                    onChange={(e) => handleInputChange('author_role', e.target.value)}
+                    placeholder="Fellow, Editor, Contributor..."
+                    className={cn(errors.author_role && "border-destructive")}
+                  />
+                  {errors.author_role && (
+                    <p className="text-sm text-destructive mt-1">{errors.author_role}</p>
+                  )}
+                </div>
+                <div>
+                  <Label htmlFor="organization">
+                    Organization <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="organization"
+                    value={formData.author_organization}
+                    onChange={(e) => handleInputChange('author_organization', e.target.value)}
+                    placeholder="Newsreel"
+                    className={cn(errors.author_organization && "border-destructive")}
+                  />
+                  {errors.author_organization && (
+                    <p className="text-sm text-destructive mt-1">{errors.author_organization}</p>
+                  )}
+                </div>
               </div>
-              <div>
-                <Label htmlFor="organization">
-                  Organization <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="organization"
-                  value={formData.author_organization}
-                  onChange={(e) => handleInputChange('author_organization', e.target.value)}
-                  placeholder="Newsreel"
-                  className={cn(errors.author_organization && "border-destructive")}
-                />
-                {errors.author_organization && (
-                  <p className="text-sm text-destructive mt-1">{errors.author_organization}</p>
-                )}
-              </div>
-            </div>
+            )}
 
             {/* Bio */}
             <div>
