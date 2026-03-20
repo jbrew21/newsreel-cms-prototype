@@ -5,7 +5,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { supabase } from '@/lib/supabase/client'
-import { ensureUserExistsInAuth } from '@/lib/supabase/auth'
 import { useRouter } from 'next/navigation'
 
 /**
@@ -81,15 +80,6 @@ export function LoginForm() {
 
     try {
       const normalizedEmail = email.trim().toLowerCase()
-
-      // Ensure user exists in Supabase Auth (creates if new)
-      const { success, error: authError } = await ensureUserExistsInAuth(normalizedEmail)
-      if (!success) {
-        setError(authError || 'Failed to prepare your account. Please try again.')
-        setIsLoading(false)
-        return
-      }
-
       setUserEmail(normalizedEmail)
 
       const { error: otpError } = await supabase.auth.signInWithOtp({
