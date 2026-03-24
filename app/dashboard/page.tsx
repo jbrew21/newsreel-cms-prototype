@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, BarChart3 } from 'lucide-react'
+import { Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, BarChart3, Globe, EyeOff } from 'lucide-react'
 import { deleteStory } from '@/lib/supabase/brief'
 import { cn } from '@/lib/utils'
 import { Sidebar, MobileHeader, TabContent, type TabId } from '@/components/dashboard'
@@ -86,6 +87,13 @@ export default function DashboardPage() {
   const [monthlyReaders, setMonthlyReaders] = useState(0)
   const [quizAccuracy, setQuizAccuracy] = useState<number | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // Bulk selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [bulkPublishing, setBulkPublishing] = useState(false)
+  const [bulkUnpublishing, setBulkUnpublishing] = useState(false)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
 
   // ── Data fetching (unchanged) ──────────────────────────────────────
 
@@ -373,6 +381,7 @@ export default function DashboardPage() {
       setAllStories(prev => prev.filter(s => s.id !== storyId))
       setSelectedContent(null)
       setDeleteConfirmId(null)
+      setSelectedIds(prev => { const next = new Set(prev); next.delete(storyId); return next })
     } else {
       console.error('Delete failed:', result.error)
     }
@@ -396,6 +405,48 @@ export default function DashboardPage() {
     setPublishing(false)
   }
 
+  const handleBulkPublish = async () => {
+    const ids = [...selectedIds].filter(id => publishableStoryIds.has(id))
+    setBulkPublishing(true)
+    const now = new Date().toISOString()
+    await Promise.all(ids.map(id =>
+      supabase.from('stories').update({ published_at: now }).eq('id', id)
+    ))
+    setStories(prev => prev.map(s => ids.includes(s.id) ? { ...s, published_at: now } : s))
+    setAllStories(prev => prev.map(s => ids.includes(s.id) ? { ...s, published_at: now } : s))
+    setSelectedIds(new Set())
+    setBulkPublishing(false)
+  }
+
+  const handleBulkUnpublish = async () => {
+    const ids = [...selectedIds].filter(id => publishableStoryIds.has(id))
+    setBulkUnpublishing(true)
+    await Promise.all(ids.map(id =>
+      supabase.from('stories').update({ published_at: null }).eq('id', id)
+    ))
+    setStories(prev => prev.map(s => ids.includes(s.id) ? { ...s, published_at: null } : s))
+    setAllStories(prev => prev.map(s => ids.includes(s.id) ? { ...s, published_at: null } : s))
+    setSelectedIds(new Set())
+    setBulkUnpublishing(false)
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = [...selectedIds].filter(id => deletableStoryIds.has(id))
+    setBulkDeleting(true)
+    for (const id of ids) {
+      const result = await deleteStory(id)
+      if (result.success) {
+        setStories(prev => prev.filter(s => s.id !== id))
+        setAllStories(prev => prev.filter(s => s.id !== id))
+      } else {
+        console.error(`Bulk delete failed for story ${id}:`, result.error)
+      }
+    }
+    setSelectedIds(new Set())
+    setBulkDeleteConfirm(false)
+    setBulkDeleting(false)
+  }
+
   const handleNewStory = () => {
     sessionStorage.removeItem('briefDraftState')
     sessionStorage.removeItem('aiGenerated')
@@ -404,6 +455,8 @@ export default function DashboardPage() {
 
   const handleTabChange = (tab: TabId) => {
     setActiveTab(tab)
+    setSelectedIds(new Set())
+    setBulkDeleteConfirm(false)
     if (tab === 'all') fetchAllStories()
   }
 
@@ -413,6 +466,25 @@ export default function DashboardPage() {
     if (!selectedContent || selectedContent.type !== 'story') return false
     if (isInternalTeam) return true
     return stories.some(s => s.id === selectedContent.data.id)
+  }
+
+  const deletableStoryIds = useMemo(() => {
+    if (isInternalTeam) return new Set([...stories.map(s => s.id), ...allStories.map(s => s.id)])
+    return new Set(stories.map(s => s.id))
+  }, [isInternalTeam, stories, allStories])
+
+  const publishableStoryIds = useMemo(() => new Set([
+    ...stories.map(s => s.id),
+    ...(isInternalTeam ? allStories.map(s => s.id) : []),
+  ]), [isInternalTeam, stories, allStories])
+
+  const toggleSelection = (storyId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(storyId) ? next.delete(storyId) : next.add(storyId)
+      return next
+    })
   }
 
   const getAuthorName = () => {
@@ -562,6 +634,8 @@ export default function DashboardPage() {
                       key={`${item.type}-${item.data.id}`}
                       item={item}
                       onClick={() => setSelectedContent(item)}
+                      isSelected={item.type === 'story' && selectedIds.has(item.data.id)}
+                      onToggleSelect={item.type === 'story' ? (e) => toggleSelection(item.data.id, e) : undefined}
                     />
                   ))}
                 </div>
@@ -584,6 +658,8 @@ export default function DashboardPage() {
                       key={`${item.type}-${item.data.id}`}
                       item={item}
                       onClick={() => setSelectedContent(item)}
+                      isSelected={item.type === 'story' && selectedIds.has(item.data.id)}
+                      onToggleSelect={item.type === 'story' ? (e) => toggleSelection(item.data.id, e) : undefined}
                     />
                   ))}
                 </div>
@@ -629,7 +705,12 @@ export default function DashboardPage() {
                 {filteredAllStories.map((story) => (
                   <Card
                     key={`all-${story.id}`}
-                    className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all duration-200"
+                    className={cn(
+                      "overflow-hidden cursor-pointer transition-all duration-200 group",
+                      selectedIds.has(story.id)
+                        ? "ring-2 ring-primary"
+                        : "hover:ring-2 hover:ring-primary/50"
+                    )}
                     onClick={() => setSelectedContent({ type: 'story', data: story })}
                   >
                     <div className="aspect-video bg-muted relative overflow-hidden">
@@ -649,11 +730,40 @@ export default function DashboardPage() {
                           <FileText className="h-12 w-12 text-muted-foreground/50" />
                         </div>
                       )}
+
+                      {/* Status badge: visible when not hovered AND not selected */}
                       <div className={cn(
-                        "absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium",
-                        story.published_at ? "bg-green-500/90 text-white" : "bg-amber-500/90 text-white"
+                        "absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium transition-opacity duration-150",
+                        story.published_at ? "bg-green-500/90 text-white" : "bg-amber-500/90 text-white",
+                        selectedIds.has(story.id) ? "opacity-0" : "opacity-100 group-hover:opacity-0"
                       )}>
                         {story.published_at ? 'Published' : 'Draft'}
+                      </div>
+
+                      {/* Checkbox: hidden until hover OR selected */}
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Select story"
+                        aria-pressed={selectedIds.has(story.id)}
+                        className={cn(
+                          "absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded transition-opacity duration-150",
+                          "bg-background/80 backdrop-blur-sm border border-border",
+                          selectedIds.has(story.id) ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        )}
+                        onClick={(e) => toggleSelection(story.id, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            toggleSelection(story.id, e as any)
+                          }
+                        }}
+                      >
+                        <Checkbox
+                          checked={selectedIds.has(story.id)}
+                          onCheckedChange={() => {}}
+                          className="pointer-events-none h-4 w-4"
+                        />
                       </div>
                     </div>
                     <div className="p-4">
@@ -693,6 +803,109 @@ export default function DashboardPage() {
 
         </div>
       </main>
+
+      {/* ── Bulk Action Bar ─────────────────────────────────────────── */}
+      {selectedIds.size > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-bottom-4 duration-200">
+          <div className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-border bg-background shadow-lg shadow-black/10 dark:shadow-black/40">
+            {/* Count label */}
+            <span className="text-sm font-medium text-foreground pr-2 border-r border-border">
+              {selectedIds.size} selected
+            </span>
+
+            {/* Publish and Unpublish buttons (hidden during delete confirm) */}
+            {!bulkDeleteConfirm && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={bulkPublishing || bulkUnpublishing || bulkDeleting}
+                  onClick={handleBulkPublish}
+                  className="h-8 px-3"
+                >
+                  {bulkPublishing ? (
+                    <span className="text-xs">Publishing...</span>
+                  ) : (
+                    <>
+                      <Globe className="h-3.5 w-3.5 mr-1.5" />
+                      <span className="text-xs">Publish</span>
+                    </>
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={bulkPublishing || bulkUnpublishing || bulkDeleting}
+                  onClick={handleBulkUnpublish}
+                  className="h-8 px-3"
+                >
+                  {bulkUnpublishing ? (
+                    <span className="text-xs">Unpublishing...</span>
+                  ) : (
+                    <>
+                      <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                      <span className="text-xs">Unpublish</span>
+                    </>
+                  )}
+                </Button>
+              </>
+            )}
+
+            {/* Delete button or confirm UI */}
+            {[...selectedIds].some(id => deletableStoryIds.has(id)) && (
+              bulkDeleteConfirm ? (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-destructive font-medium">
+                    Delete {selectedIds.size} {selectedIds.size === 1 ? 'story' : 'stories'}?
+                  </span>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    disabled={bulkDeleting}
+                    onClick={handleBulkDelete}
+                    className="h-7 px-3 text-xs"
+                  >
+                    {bulkDeleting ? 'Deleting...' : 'Yes, delete'}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={bulkDeleting}
+                    onClick={() => setBulkDeleteConfirm(false)}
+                    className="h-7 px-3 text-xs"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={bulkPublishing || bulkUnpublishing || bulkDeleting}
+                  onClick={() => setBulkDeleteConfirm(true)}
+                  className="text-destructive hover:text-destructive hover:bg-destructive/10 h-8 px-3"
+                >
+                  <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                  <span className="text-xs">Delete</span>
+                </Button>
+              )
+            )}
+
+            {/* Divider + Clear button */}
+            <div className="w-px h-4 bg-border mx-1" />
+            <Button
+              variant="ghost"
+              size="icon"
+              disabled={bulkDeleting}
+              onClick={() => { setSelectedIds(new Set()); setBulkDeleteConfirm(false) }}
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              aria-label="Clear selection"
+            >
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* ── Preview Modal (unchanged) ────────────────────────────── */}
       {selectedContent && (
@@ -864,10 +1077,27 @@ export default function DashboardPage() {
 
 // ── Content Card (reusable) ──────────────────────────────────────────────────
 
-function ContentCard({ item, onClick }: { item: ContentItem; onClick: () => void }) {
+function ContentCard({
+  item,
+  onClick,
+  isSelected = false,
+  onToggleSelect,
+}: {
+  item: ContentItem
+  onClick: () => void
+  isSelected?: boolean
+  onToggleSelect?: (e: React.MouseEvent) => void
+}) {
+  const isSelectable = item.type === 'story' && !!onToggleSelect
+
   return (
     <Card
-      className="overflow-hidden cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all duration-200"
+      className={cn(
+        "overflow-hidden cursor-pointer transition-all duration-200 group",
+        isSelected
+          ? "ring-2 ring-primary"
+          : "hover:ring-2 hover:ring-primary/50"
+      )}
       onClick={onClick}
     >
       <div className="aspect-video bg-muted relative overflow-hidden">
@@ -902,13 +1132,52 @@ function ContentCard({ item, onClick }: { item: ContentItem; onClick: () => void
           {item.type === 'story' ? 'Brief' : 'Video'}
         </div>
 
-        {/* Status badge */}
-        <div className={cn(
-          "absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium",
-          item.data.published_at ? "bg-green-500/90 text-white" : "bg-amber-500/90 text-white"
-        )}>
-          {item.data.published_at ? 'Published' : 'Draft'}
-        </div>
+        {/* Status badge OR Checkbox */}
+        {isSelectable ? (
+          <>
+            {/* Status badge: visible when not hovered AND not selected */}
+            <div className={cn(
+              "absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium transition-opacity duration-150",
+              item.data.published_at ? "bg-green-500/90 text-white" : "bg-amber-500/90 text-white",
+              isSelected ? "opacity-0" : "opacity-100 group-hover:opacity-0"
+            )}>
+              {item.data.published_at ? 'Published' : 'Draft'}
+            </div>
+
+            {/* Checkbox: hidden until hover OR selected */}
+            <div
+              role="button"
+              tabIndex={0}
+              aria-label="Select story"
+              aria-pressed={isSelected}
+              className={cn(
+                "absolute top-2 right-2 flex items-center justify-center w-7 h-7 rounded transition-opacity duration-150",
+                "bg-background/80 backdrop-blur-sm border border-border",
+                isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+              )}
+              onClick={onToggleSelect}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  onToggleSelect?.(e as any)
+                }
+              }}
+            >
+              <Checkbox
+                checked={isSelected}
+                onCheckedChange={() => {}}
+                className="pointer-events-none h-4 w-4"
+              />
+            </div>
+          </>
+        ) : (
+          <div className={cn(
+            "absolute top-2 right-2 px-2 py-1 rounded text-xs font-medium",
+            item.data.published_at ? "bg-green-500/90 text-white" : "bg-amber-500/90 text-white"
+          )}>
+            {item.data.published_at ? 'Published' : 'Draft'}
+          </div>
+        )}
       </div>
 
       <div className="p-4">
