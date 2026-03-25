@@ -20,6 +20,10 @@ import type { MediaItem } from '@/lib/media-search/types'
 import { AIStoryGenerator } from '@/components/ai-story-generator'
 import { BackgroundSelectorModal, VideoRecorderModal, AuthorVideoPreview } from '@/components/video-recorder'
 import type { BackgroundConfig } from '@/hooks/use-video-compositor'
+import { AIQuizPollRecommender } from '@/components/ai-quiz-poll-recommender'
+import dynamic from 'next/dynamic'
+
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false })
 
 interface Author {
   id: string
@@ -115,6 +119,10 @@ export default function CreateContentPage() {
 
   // Back confirmation modal
   const [showBackConfirm, setShowBackConfirm] = useState(false)
+
+  // AI Quiz/Poll Recommender modal
+  const [aiRecommenderOpen, setAiRecommenderOpen] = useState(false)
+  const [aiRecommenderType, setAiRecommenderType] = useState<'quiz' | 'poll'>('quiz')
 
   // Drag and drop state
   const [draggedSlideId, setDraggedSlideId] = useState<string | null>(null)
@@ -625,6 +633,41 @@ export default function CreateContentPage() {
 
     setDraggedSlideId(null)
     setDragOverSlideId(null)
+  }
+
+  const handleQuizSelected = (quiz: any) => {
+    setStoryData(prev => ({
+      ...prev,
+      quiz: {
+        quiz_content: quiz.question,
+        quiz_answer_a: quiz.options[0] || '',
+        quiz_answer_b: quiz.options[1] || '',
+        quiz_answer_c: quiz.options[2] || '',
+        quiz_answer_d: quiz.options[3] || '',
+      },
+    }))
+  }
+
+  const handlePollSelected = (poll: any) => {
+    setStoryData(prev => ({
+      ...prev,
+      poll: {
+        question: poll.question,
+        econ_weight: null,
+        social_weight: null,
+        importance: null,
+      },
+    }))
+  }
+
+  const openQuizRecommender = () => {
+    setAiRecommenderType('quiz')
+    setAiRecommenderOpen(true)
+  }
+
+  const openPollRecommender = () => {
+    setAiRecommenderType('poll')
+    setAiRecommenderOpen(true)
   }
 
   const handleContinue = () => {
@@ -1491,7 +1534,7 @@ export default function CreateContentPage() {
             />
 
             {/* Quiz Slide (Optional) */}
-            <Card className="p-6">
+            <Card className="p-6 relative overflow-hidden">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-lg font-semibold text-card-foreground">
@@ -1599,28 +1642,53 @@ export default function CreateContentPage() {
                   </div>
                 </div>
               ) : (
-                <Button
-                  variant="outline"
-                  onClick={() => setStoryData(prev => ({
-                    ...prev,
-                    quiz: {
-                      quiz_content: '',
-                      quiz_answer_a: '',
-                      quiz_answer_b: '',
-                      quiz_answer_c: '',
-                      quiz_answer_d: '',
-                    }
-                  }))}
-                  className="w-full border-dashed"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Quiz Slide
-                </Button>
+                <div className="space-y-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStoryData(prev => ({
+                      ...prev,
+                      quiz: {
+                        quiz_content: '',
+                        quiz_answer_a: '',
+                        quiz_answer_b: '',
+                        quiz_answer_c: '',
+                        quiz_answer_d: '',
+                      }
+                    }))}
+                    className="w-full border-dashed"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Quiz Slide
+                  </Button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-border"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="px-2 bg-card text-muted-foreground">or</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={openQuizRecommender}
+                    className="w-full"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="relative w-4 h-4">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-purple-400 to-pink-400 animate-spin opacity-75"></div>
+                        <div className="absolute inset-0.5 bg-card rounded-full"></div>
+                      </div>
+                      <span>Create Quiz with AI</span>
+                    </div>
+                  </Button>
+                </div>
               )}
             </Card>
 
             {/* Poll Slide (Optional) */}
-            <Card className="p-6">
+            <Card className="p-6 relative overflow-hidden">
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <h2 className="text-lg font-semibold text-card-foreground">
@@ -1727,22 +1795,47 @@ export default function CreateContentPage() {
                   </div> */}
                 </div>
               ) : (
-                <Button
-                  variant="outline"
-                  onClick={() => setStoryData(prev => ({
-                    ...prev,
-                    poll: {
-                      question: '',
-                      econ_weight: null,
-                      social_weight: null,
-                      importance: null,
-                    }
-                  }))}
-                  className="w-full border-dashed"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Poll Slide
-                </Button>
+                <div className="space-y-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStoryData(prev => ({
+                      ...prev,
+                      poll: {
+                        question: '',
+                        econ_weight: null,
+                        social_weight: null,
+                        importance: null,
+                      }
+                    }))}
+                    className="w-full border-dashed"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Poll Slide
+                  </Button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-border"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="px-2 bg-card text-muted-foreground">or</span>
+                    </div>
+                  </div>
+
+                  <Button
+                    variant="outline"
+                    onClick={openPollRecommender}
+                    className="w-full"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="relative w-4 h-4">
+                        <div className="absolute inset-0 rounded-full bg-gradient-to-r from-cyan-400 to-blue-400 animate-spin opacity-75"></div>
+                        <div className="absolute inset-0.5 bg-card rounded-full"></div>
+                      </div>
+                      <span>Create Poll with AI</span>
+                    </div>
+                  </Button>
+                </div>
               )}
             </Card>
         </div>
@@ -1762,6 +1855,18 @@ export default function CreateContentPage() {
           </div>
         </div>
       </footer>
+
+      {/* AI Quiz/Poll Recommender Modal */}
+      <AIQuizPollRecommender
+        open={aiRecommenderOpen}
+        onOpenChange={setAiRecommenderOpen}
+        headline={storyData.story_headline}
+        subhead={storyData.subhead}
+        slides={storyData.slides}
+        onQuizSelected={handleQuizSelected}
+        onPollSelected={handlePollSelected}
+        type={aiRecommenderType}
+      />
 
       {/* Back Confirmation Modal */}
       {showBackConfirm && (
