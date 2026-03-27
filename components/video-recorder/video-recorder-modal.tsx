@@ -29,7 +29,7 @@ export function VideoRecorderModal({
   onRecordingComplete,
   maxDuration = 60,
 }: VideoRecorderModalProps) {
-  const [phase, setPhase] = useState<'loading' | 'ready' | 'recording' | 'preview'>('loading')
+  const [phase, setPhase] = useState<'loading' | 'ready' | 'recording' | 'preview' | 'converting'>('loading')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const webcamStreamRef = useRef<MediaStream | null>(null)
@@ -183,16 +183,46 @@ export function VideoRecorderModal({
     }
   }, [previewUrl, resetRecorder, start, background])
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback(async () => {
     const blob = getBlob()
     if (!blob) return
 
-    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm'
-    const file = new File([blob], `author-video-${Date.now()}.${ext}`, { type: blob.type })
+    // If already MP4 (rare, some browsers), skip conversion
+    if (blob.type.includes('mp4')) {
+      const file = new File([blob], `author-video-${Date.now()}.mp4`, { type: 'video/mp4' })
+      onRecordingComplete(file)
+      cleanup()
+      onOpenChange(false)
+      return
+    }
 
-    onRecordingComplete(file)
-    cleanup()
-    onOpenChange(false)
+    // Convert WebM → MP4 (H.264/AAC) via server
+    setPhase('converting')
+    try {
+      const formData = new FormData()
+      formData.append('video', blob, 'recording.webm')
+
+      const res = await fetch('/api/video/convert', { method: 'POST', body: formData })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Conversion failed' }))
+        throw new Error(err.error || 'Conversion failed')
+      }
+
+      const mp4Blob = await res.blob()
+      const file = new File([mp4Blob], `author-video-${Date.now()}.mp4`, { type: 'video/mp4' })
+
+      onRecordingComplete(file)
+      cleanup()
+      onOpenChange(false)
+    } catch (err: any) {
+      console.error('[VideoRecorder] Conversion failed:', err)
+      // Fall back to WebM if conversion fails — better than losing the recording
+      const file = new File([blob], `author-video-${Date.now()}.webm`, { type: blob.type })
+      onRecordingComplete(file)
+      cleanup()
+      onOpenChange(false)
+    }
   }, [getBlob, onRecordingComplete, cleanup, onOpenChange])
 
   const formatTime = (seconds: number) => {
@@ -229,6 +259,14 @@ export function VideoRecorderModal({
               <p className="text-white/60 text-xs">
                 {!isDirectMode ? 'Loading camera & background model...' : 'Starting camera...'}
               </p>
+            </div>
+          )}
+
+          {/* Converting overlay */}
+          {phase === 'converting' && (
+            <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 bg-black">
+              <Loader2 className="h-6 w-6 text-white animate-spin" />
+              <p className="text-white/60 text-xs">Converting video for mobile compatibility...</p>
             </div>
           )}
 
