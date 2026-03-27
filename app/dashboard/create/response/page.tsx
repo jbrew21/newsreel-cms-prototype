@@ -3,11 +3,12 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
-import { saveBriefPost, updateBriefPost } from '@/lib/supabase/brief'
+import { saveBriefPost, updateBriefPost, getFullBriefStory } from '@/lib/supabase/brief'
 import { saveVerticalVideoPost } from '@/lib/supabase/video-feed'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ArrowLeft, Check, FileText, Loader2, Video, HelpCircle, BarChart3, Image as ImageIcon, Play, User, ExternalLink, Pencil, PlusCircle } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { ArrowLeft, Check, FileText, Loader2, Video, HelpCircle, BarChart3, Image as ImageIcon, Play, User, ExternalLink, Pencil, PlusCircle, Copy } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
 import type { BriefFormData, VerticalVideoFormData, SaveMode, EditBriefMetadata } from '@/lib/supabase/types'
@@ -39,6 +40,9 @@ export default function ResponsePage() {
   const [savedStoryId, setSavedStoryId] = useState<string | null>(null)
   const [savedVideoUrl, setSavedVideoUrl] = useState<string | null>(null)
   const [savedMode, setSavedMode] = useState<SaveMode | null>(null)
+  const [showRepublishModal, setShowRepublishModal] = useState(false)
+  const [copiedEmbed, setCopiedEmbed] = useState(false)
+  const [savedStoryFull, setSavedStoryFull] = useState<{ storyData: BriefFormData; editMetadata: EditBriefMetadata } | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [mediaWarnings, setMediaWarnings] = useState<string[]>([])
   const [previewUrls, setPreviewUrls] = useState<{
@@ -58,6 +62,14 @@ export default function ResponsePage() {
     checkUser()
     loadDraftState()
   }, [])
+
+  useEffect(() => {
+    if (saveStatus === 'success' && savedStoryId && !isVerticalVideo) {
+      getFullBriefStory(savedStoryId).then(result => {
+        if (result) setSavedStoryFull(result)
+      })
+    }
+  }, [saveStatus, savedStoryId, isVerticalVideo])
 
   const checkUser = async () => {
     try {
@@ -343,6 +355,249 @@ export default function ResponsePage() {
     router.push(`/dashboard/create/content?format=${fmt}&storyId=${savedStoryId}`)
   }
 
+  const generateEmbedCode = (): string => {
+    if (!savedStoryId) return ''
+
+    const story = savedStoryFull?.storyData
+    const originalUrl = `https://app.newsreel.co/story/${savedStoryId}`
+    const authorName = story?.author_name || draftState?.author_name || getAuthorName()
+    const headline = story?.story_headline || draftState?.story_headline || ''
+    const subhead = story?.subhead || (draftState as any)?.subhead || ''
+    const coverUrl = story?.headlinePhotoUrl || ''
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    const slides = story?.slides ?? draftState?.slides ?? []
+    const totalSlides = slides.length
+
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+    const isVideoUrl = (url: string) => /\.(mp4|mov|webm|avi)(\?|$)/i.test(url)
+
+    const coverHtml = coverUrl
+      ? `
+    <div class="nr-cover-media">
+      ${isVideoUrl(coverUrl)
+        ? `<video src="${coverUrl}" class="nr-media-el" autoplay muted loop playsinline></video>`
+        : `<img src="${coverUrl}" alt="${esc(headline)}" class="nr-media-el" />`}
+    </div>`
+      : ''
+
+    const slidesHtml = slides.map((slide, i) => {
+      const mediaUrls: string[] = slide.existingMediaUrls?.length
+        ? slide.existingMediaUrls
+        : (slide as any).savedMediaUrls?.length
+          ? (slide as any).savedMediaUrls
+          : []
+      const mediaUrl = mediaUrls[0] || ''
+
+      const mediaHtml = mediaUrl
+        ? `
+      <div class="nr-slide-media">
+        ${isVideoUrl(mediaUrl)
+          ? `<video src="${mediaUrl}" class="nr-media-el" controls muted playsinline></video>`
+          : `<img src="${mediaUrl}" alt="${esc(slide.slide_headline_1 || '')}" class="nr-media-el" />`}
+        ${slide.slide_media_source ? `<p class="nr-media-caption">${esc(slide.slide_media_source)}</p>` : ''}
+      </div>`
+        : ''
+
+      const quoteHtml = slide.slide_quote
+        ? `<blockquote class="nr-slide-quote">"${esc(slide.slide_quote)}"</blockquote>`
+        : ''
+
+      return `
+    <div class="nr-slide">
+      <span class="nr-slide-counter">${i + 1}/${totalSlides}</span>
+      ${mediaHtml}
+      ${slide.slide_headline_1 ? `<h2 class="nr-slide-headline">${esc(slide.slide_headline_1)}</h2>` : ''}
+      ${slide.slide_content_1 ? `<p class="nr-slide-content">${esc(slide.slide_content_1)}</p>` : ''}
+      ${quoteHtml}
+    </div>`
+    }).join('\n    <hr class="nr-divider" />')
+
+    const quizHtml = (story?.quiz ?? draftState?.quiz)?.quiz_content
+      ? `
+  <div class="nr-quiz">
+    <div class="nr-section-label">
+      <span class="nr-label-icon">&#10067;</span> Quiz
+    </div>
+    <p class="nr-quiz-question">${esc((story?.quiz ?? draftState?.quiz)!.quiz_content)}</p>
+    <p class="nr-section-cta">Answer this quiz on <a href="${originalUrl}" target="_blank">Newsreel</a></p>
+  </div>`
+      : ''
+
+    const pollHtml = (story?.poll ?? draftState?.poll)?.question
+      ? `
+  <div class="nr-poll">
+    <div class="nr-section-label">
+      <span class="nr-label-icon">&#9641;</span> Poll
+    </div>
+    <p class="nr-quiz-question">${esc((story?.poll ?? draftState?.poll)!.question)}</p>
+    <p class="nr-section-cta">Vote on <a href="${originalUrl}" target="_blank">Newsreel</a></p>
+  </div>`
+      : ''
+
+    return `<article class="nr-story">
+
+  <!-- Cover -->
+  <div class="nr-cover">
+    ${coverHtml}
+    <h1 class="nr-headline">${esc(headline)}</h1>
+    ${subhead ? `<p class="nr-subhead">${esc(subhead)}</p>` : ''}
+    <p class="nr-author">By <strong>${esc(authorName)}</strong> &middot; <span class="nr-date">${date}</span></p>
+  </div>
+
+  <!-- Slides -->
+  <div class="nr-slides">
+    ${slidesHtml}
+  </div>
+  ${quizHtml}
+  ${pollHtml}
+
+  <!-- Footer -->
+  <footer class="nr-footer">
+    <p>Originally published by <a href="https://newsreel.co" target="_blank">Newsreel</a> &middot; <a href="${originalUrl}" target="_blank">View original article</a></p>
+  </footer>
+
+</article>
+
+<style>
+.nr-story {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.65;
+  color: #1a1a1a;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 24px 20px;
+  box-sizing: border-box;
+}
+/* Cover */
+.nr-cover { margin-bottom: 40px; }
+.nr-cover-media {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  background: #f0f0f0;
+}
+.nr-media-el {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.nr-headline {
+  font-size: 2em;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 10px;
+  color: #111;
+}
+.nr-subhead {
+  font-size: 1.1em;
+  color: #555;
+  margin: 0 0 14px;
+}
+.nr-author {
+  font-size: 0.9em;
+  color: #777;
+  margin: 0;
+}
+.nr-date { color: #999; }
+/* Slides */
+.nr-slides { border-top: 1px solid #eee; }
+.nr-slide { padding: 32px 0; }
+.nr-divider { border: none; border-top: 1px solid #eee; margin: 0; }
+.nr-slide-counter {
+  display: inline-block;
+  font-size: 0.8em;
+  font-weight: 500;
+  color: #999;
+  margin-bottom: 16px;
+}
+.nr-slide-media {
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 10px;
+  background: #f0f0f0;
+}
+.nr-media-caption {
+  font-size: 0.78em;
+  color: #aaa;
+  font-style: italic;
+  margin: 6px 0 16px;
+}
+.nr-slide-headline {
+  font-size: 1.35em;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 10px;
+  line-height: 1.3;
+}
+.nr-slide-content {
+  font-size: 1.05em;
+  color: #333;
+  margin: 0 0 12px;
+}
+.nr-slide-quote {
+  border-left: 3px solid #d1d5db;
+  margin: 16px 0;
+  padding: 8px 16px;
+  color: #555;
+  font-style: italic;
+  font-size: 1em;
+}
+/* Quiz & Poll */
+.nr-quiz, .nr-poll {
+  border: 1px solid #eee;
+  border-radius: 10px;
+  padding: 20px 24px;
+  margin: 24px 0;
+  background: #fafafa;
+}
+.nr-section-label {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+.nr-quiz-question {
+  font-size: 1.1em;
+  font-weight: 600;
+  color: #111;
+  margin: 0 0 10px;
+  text-align: center;
+}
+.nr-section-cta {
+  font-size: 0.85em;
+  color: #999;
+  text-align: center;
+  margin: 0;
+}
+.nr-section-cta a { color: #e63946; text-decoration: none; }
+.nr-section-cta a:hover { text-decoration: underline; }
+/* Footer */
+.nr-footer {
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 1px solid #eee;
+  font-size: 0.85em;
+  color: #999;
+}
+.nr-footer a { color: #555; text-decoration: none; }
+.nr-footer a:hover { text-decoration: underline; }
+</style>`
+  }
+
+  const handleCopyEmbed = () => {
+    navigator.clipboard.writeText(generateEmbedCode())
+    setCopiedEmbed(true)
+    setTimeout(() => setCopiedEmbed(false), 2000)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -403,10 +658,47 @@ export default function ResponsePage() {
             </div>
           )}
 
+          {/* Republish modal */}
+          <Dialog open={showRepublishModal} onOpenChange={setShowRepublishModal}>
+            <DialogContent className="max-w-2xl flex flex-col max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle>Republish this article</DialogTitle>
+                <DialogDescription>
+                  We encourage you to republish this article online and in print, it&apos;s free under our republication policy.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-auto mt-1">
+                <pre className="text-xs bg-muted rounded-md p-4 overflow-auto whitespace-pre-wrap break-all font-mono leading-relaxed border border-border">
+                  {generateEmbedCode()}
+                </pre>
+              </div>
+              <div className="pt-4 border-t border-border mt-2">
+                <Button
+                  variant={copiedEmbed ? 'outline' : 'default'}
+                  size="sm"
+                  className="w-full"
+                  onClick={handleCopyEmbed}
+                >
+                  {copiedEmbed ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 mr-1.5" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copy code
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* Story preview */}
           {storyPreviewUrl && (
             <div>
-              {/* Preview label + link */}
+              {/* Preview label + actions */}
               <div className="flex items-center justify-between mb-2 px-0.5">
                 <p className="text-xs text-muted-foreground">
                   Preview of webapp &middot; <span className={cn(
@@ -414,15 +706,23 @@ export default function ResponsePage() {
                     savedMode === 'publish' ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
                   )}>{modeLabel}</span>
                 </p>
-                <a
-                  href={storyPreviewUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  See full article
-                  <ExternalLink className="h-3 w-3" />
-                </a>
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setShowRepublishModal(true)}
+                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    &lt;/&gt; Get republish code
+                  </button>
+                  <a
+                    href={storyPreviewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    See full article
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
               </div>
 
               {/* Iframe */}
