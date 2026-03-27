@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, BarChart3, Globe, EyeOff } from 'lucide-react'
+import { Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, BarChart3, Globe, EyeOff, RefreshCw, ChevronDown } from 'lucide-react'
 import { deleteStory } from '@/lib/supabase/brief'
 import { cn } from '@/lib/utils'
 import { Sidebar, MobileHeader, TabContent, type TabId } from '@/components/dashboard'
@@ -54,6 +54,8 @@ type ContentItem =
   | { type: 'story'; data: StoryWithMedia }
   | { type: 'video'; data: VideoFeedWithMedia }
 
+const PAGE_SIZE = 24
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function getGreeting(): string {
@@ -95,7 +97,14 @@ export default function DashboardPage() {
   const [bulkUnpublishing, setBulkUnpublishing] = useState(false)
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
 
-  // ── Data fetching (unchanged) ──────────────────────────────────────
+  // Pagination: how many items to show per tab
+  const [draftsVisible, setDraftsVisible] = useState(PAGE_SIZE)
+  const [publishedVisible, setPublishedVisible] = useState(PAGE_SIZE)
+  const [allStoriesPage, setAllStoriesPage] = useState(0)
+  const [allStoriesHasMore, setAllStoriesHasMore] = useState(true)
+  const [allStoriesLoadingMore, setAllStoriesLoadingMore] = useState(false)
+
+  // ── Data fetching ───────────────────────────────────────────────────
 
   useEffect(() => {
     checkUser()
@@ -294,9 +303,17 @@ export default function DashboardPage() {
     }
   }
 
-  const fetchAllStories = async () => {
+  const fetchAllStories = async (loadMore = false) => {
     try {
-      setAllStoriesLoading(true)
+      if (loadMore) {
+        setAllStoriesLoadingMore(true)
+      } else {
+        setAllStoriesLoading(true)
+      }
+
+      const page = loadMore ? allStoriesPage + 1 : 0
+      const from = page * PAGE_SIZE
+      const to = from + PAGE_SIZE - 1
 
       const { data: storiesData } = await supabase
         .from('stories')
@@ -323,6 +340,7 @@ export default function DashboardPage() {
           )
         `)
         .order('created_at', { ascending: false })
+        .range(from, to)
 
       if (storiesData) {
         const storiesWithUrls = storiesData.map((story: any) => {
@@ -353,12 +371,20 @@ export default function DashboardPage() {
             authorName,
           }
         })
-        setAllStories(storiesWithUrls)
+
+        if (loadMore) {
+          setAllStories(prev => [...prev, ...storiesWithUrls])
+        } else {
+          setAllStories(storiesWithUrls)
+        }
+        setAllStoriesPage(page)
+        setAllStoriesHasMore(storiesData.length === PAGE_SIZE)
       }
     } catch (error) {
       console.error('Error fetching all stories:', error)
     } finally {
       setAllStoriesLoading(false)
+      setAllStoriesLoadingMore(false)
     }
   }
 
@@ -457,7 +483,8 @@ export default function DashboardPage() {
     setActiveTab(tab)
     setSelectedIds(new Set())
     setBulkDeleteConfirm(false)
-    if (tab === 'all') fetchAllStories()
+    // Only fetch All stories if we haven't loaded them yet (cache)
+    if (tab === 'all' && allStories.length === 0) fetchAllStories()
   }
 
   // ── Derived data ───────────────────────────────────────────────────
@@ -629,7 +656,7 @@ export default function DashboardPage() {
               <>
                 <h2 className="text-foreground text-base font-medium mb-4">Continue working</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {draftContent.map((item) => (
+                  {draftContent.slice(0, draftsVisible).map((item) => (
                     <ContentCard
                       key={`${item.type}-${item.data.id}`}
                       item={item}
@@ -639,6 +666,14 @@ export default function DashboardPage() {
                     />
                   ))}
                 </div>
+                {draftContent.length > draftsVisible && (
+                  <div className="flex justify-center mt-6">
+                    <Button variant="outline" onClick={() => setDraftsVisible(prev => prev + PAGE_SIZE)}>
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Load more ({draftContent.length - draftsVisible} remaining)
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </TabContent>
@@ -653,7 +688,7 @@ export default function DashboardPage() {
               <>
                 <h2 className="text-foreground text-base font-medium mb-4">Published</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {publishedContent.map((item) => (
+                  {publishedContent.slice(0, publishedVisible).map((item) => (
                     <ContentCard
                       key={`${item.type}-${item.data.id}`}
                       item={item}
@@ -663,6 +698,14 @@ export default function DashboardPage() {
                     />
                   ))}
                 </div>
+                {publishedContent.length > publishedVisible && (
+                  <div className="flex justify-center mt-6">
+                    <Button variant="outline" onClick={() => setPublishedVisible(prev => prev + PAGE_SIZE)}>
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                      Load more ({publishedContent.length - publishedVisible} remaining)
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </TabContent>
@@ -683,6 +726,16 @@ export default function DashboardPage() {
               <span className="text-sm text-muted-foreground hidden sm:inline">
                 {filteredAllStories.length} {filteredAllStories.length === 1 ? 'story' : 'stories'}
               </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                disabled={allStoriesLoading}
+                onClick={() => { setAllStoriesPage(0); setAllStoriesHasMore(true); fetchAllStories() }}
+                aria-label="Refresh stories"
+              >
+                <RefreshCw className={cn("h-3.5 w-3.5", allStoriesLoading && "animate-spin")} />
+              </Button>
             </div>
             {allStoriesLoading ? (
               <div className="text-center py-12 text-muted-foreground">Loading all stories...</div>
@@ -701,6 +754,7 @@ export default function DashboardPage() {
                 </p>
               </Card>
             ) : (
+              <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {filteredAllStories.map((story) => (
                   <Card
@@ -716,14 +770,13 @@ export default function DashboardPage() {
                     <div className="aspect-video bg-muted relative overflow-hidden">
                       {story.coverUrl ? (
                         story.coverMediaType === 'video' ? (
-                          <div className="relative w-full h-full">
-                            <video src={story.coverUrl} className="w-full h-full object-cover" muted preload="metadata" />
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="relative w-full h-full bg-black">
+                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                               <Video className="h-8 w-8 text-white" />
                             </div>
                           </div>
                         ) : (
-                          <img src={story.coverUrl} alt={story.story_headline || 'Story cover'} className="w-full h-full object-cover" />
+                          <img src={story.coverUrl} alt={story.story_headline || 'Story cover'} className="w-full h-full object-cover" loading="lazy" />
                         )
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -788,6 +841,23 @@ export default function DashboardPage() {
                   </Card>
                 ))}
               </div>
+              {allStoriesHasMore && !searchQuery && (
+                <div className="flex justify-center mt-6">
+                  <Button
+                    variant="outline"
+                    disabled={allStoriesLoadingMore}
+                    onClick={() => fetchAllStories(true)}
+                  >
+                    {allStoriesLoadingMore ? (
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <ChevronDown className="h-4 w-4 mr-2" />
+                    )}
+                    {allStoriesLoadingMore ? 'Loading...' : 'Load more stories'}
+                  </Button>
+                </div>
+              )}
+              </>
             )}
           </TabContent>
 
@@ -1103,17 +1173,16 @@ function ContentCard({
       <div className="aspect-video bg-muted relative overflow-hidden">
         {item.type === 'story' && item.data.coverUrl ? (
           item.data.coverMediaType === 'video' ? (
-            <div className="relative w-full h-full">
-              <video src={item.data.coverUrl} className="w-full h-full object-cover" muted preload="metadata" />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+            <div className="relative w-full h-full bg-black">
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                 <Video className="h-8 w-8 text-white" />
               </div>
             </div>
           ) : (
-            <img src={item.data.coverUrl} alt={item.data.story_headline || 'Story cover'} className="w-full h-full object-cover" />
+            <img src={item.data.coverUrl} alt={item.data.story_headline || 'Story cover'} className="w-full h-full object-cover" loading="lazy" />
           )
         ) : item.type === 'video' && item.data.posterUrl ? (
-          <img src={item.data.posterUrl} alt={item.data.headline || 'Video poster'} className="w-full h-full object-cover" />
+          <img src={item.data.posterUrl} alt={item.data.headline || 'Video poster'} className="w-full h-full object-cover" loading="lazy" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             {item.type === 'story' ? (
