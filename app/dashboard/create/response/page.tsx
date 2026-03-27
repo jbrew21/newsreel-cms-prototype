@@ -7,7 +7,7 @@ import { saveBriefPost, updateBriefPost } from '@/lib/supabase/brief'
 import { saveVerticalVideoPost } from '@/lib/supabase/video-feed'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { ArrowLeft, Check, FileText, Loader2, CheckCircle2, Video, HelpCircle, BarChart3, Image as ImageIcon, Play, User } from 'lucide-react'
+import { ArrowLeft, Check, FileText, Loader2, Video, HelpCircle, BarChart3, Image as ImageIcon, Play, User, ExternalLink, Pencil, PlusCircle } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
 import type { BriefFormData, VerticalVideoFormData, SaveMode, EditBriefMetadata } from '@/lib/supabase/types'
@@ -38,6 +38,7 @@ export default function ResponsePage() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [savedStoryId, setSavedStoryId] = useState<string | null>(null)
   const [savedVideoUrl, setSavedVideoUrl] = useState<string | null>(null)
+  const [savedMode, setSavedMode] = useState<SaveMode | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [mediaWarnings, setMediaWarnings] = useState<string[]>([])
   const [previewUrls, setPreviewUrls] = useState<{
@@ -255,6 +256,7 @@ export default function ResponsePage() {
 
       if (result.success) {
         setSaveStatus('success')
+        setSavedMode(mode)
         setSavedStoryId(result.videoFeedId)
         setSavedVideoUrl(result.videoUrl || null)
         sessionStorage.removeItem('verticalVideoDraftState')
@@ -312,6 +314,7 @@ export default function ResponsePage() {
 
       if (result.success) {
         setSaveStatus('success')
+        setSavedMode(mode)
         setSavedStoryId(result.storyId)
         if (result.mediaWarnings?.length) {
           setMediaWarnings(result.mediaWarnings)
@@ -334,6 +337,12 @@ export default function ResponsePage() {
     router.push('/dashboard/create')
   }
 
+  const handleEditStory = () => {
+    if (!savedStoryId) return
+    const fmt = isVerticalVideo ? 'vertical-video' : 'brief'
+    router.push(`/dashboard/create/content?format=${fmt}&storyId=${savedStoryId}`)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -344,78 +353,89 @@ export default function ResponsePage() {
 
   // Success state
   if (saveStatus === 'success') {
+    const storyPreviewUrl = savedStoryId ? `https://app.newsreel.co/story/${savedStoryId}` : null
+    const modeLabel = savedMode === 'draft' ? 'Draft' : 'Published'
+
     return (
       <div className="min-h-screen bg-background">
         {/* Header */}
         <header className="border-b border-border bg-card">
           <div className="container mx-auto px-4 py-4">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-primary-foreground text-sm font-bold">N</span>
-                </div>
-                <h1 className="text-xl font-heading text-foreground">NewsReel CMS</h1>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleGoToDashboard}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1.5" />
+                Go to Dashboard
+              </Button>
               <ThemeToggle />
             </div>
           </div>
         </header>
 
-        <main className="container mx-auto px-4 py-16 max-w-2xl">
-          <Card className="p-8 text-center">
-            <div className="w-16 h-16 bg-success/10 dark:bg-success/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircle2 className="h-8 w-8 text-success" />
-            </div>
-            <h2 className="text-2xl font-heading text-card-foreground mb-2">
-              {isVerticalVideo
-                ? 'Video Saved Successfully!'
-                : isEditMode
-                  ? 'Story Updated Successfully!'
-                  : 'Story Saved Successfully!'}
-            </h2>
-            <p className="text-muted-foreground mb-4">
-              {isVerticalVideo
-                ? 'Your video has been uploaded and saved.'
-                : isEditMode
-                  ? 'Your story has been updated successfully.'
-                  : 'Your story has been saved and is ready for review.'}
-            </p>
-            {mediaWarnings.length > 0 && (
-              <div className="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg text-left">
-                <div className="text-xs font-medium text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">
-                  Media Warnings
-                </div>
-                <ul className="space-y-1">
-                  {mediaWarnings.map((w, i) => (
-                    <li key={i} className="text-sm text-amber-700 dark:text-amber-300">{w}</li>
-                  ))}
-                </ul>
+        <main className="container mx-auto px-4 py-6 max-w-3xl">
+          {/* Action buttons */}
+          <div className="flex items-center justify-end gap-3 mb-5">
+            <Button variant="outline" size="sm" onClick={handleEditStory} disabled={!savedStoryId}>
+              <Pencil className="h-3.5 w-3.5 mr-1.5" />
+              Edit Story
+            </Button>
+            <Button size="sm" onClick={handleCreateAnother}>
+              <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
+              Create Another
+            </Button>
+          </div>
+
+          {/* Media warnings */}
+          {mediaWarnings.length > 0 && (
+            <div className="mb-5 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <div className="text-xs font-medium text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">
+                Media Warnings
               </div>
-            )}
-            {savedVideoUrl && (
-              <div className="mb-6 p-4 bg-muted/50 rounded-lg text-left">
-                <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
-                  Video URL
-                </div>
+              <ul className="space-y-1">
+                {mediaWarnings.map((w, i) => (
+                  <li key={i} className="text-sm text-amber-700 dark:text-amber-300">{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Story preview */}
+          {storyPreviewUrl && (
+            <div>
+              {/* Preview label + link */}
+              <div className="flex items-center justify-between mb-2 px-0.5">
+                <p className="text-xs text-muted-foreground">
+                  Preview of webapp &middot; <span className={cn(
+                    "font-medium",
+                    savedMode === 'publish' ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
+                  )}>{modeLabel}</span>
+                </p>
                 <a
-                  href={savedVideoUrl}
+                  href={storyPreviewUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-primary hover:underline break-all"
+                  className="flex items-center gap-1 text-xs text-primary hover:underline"
                 >
-                  {savedVideoUrl}
+                  See full article
+                  <ExternalLink className="h-3 w-3" />
                 </a>
               </div>
-            )}
-            <div className="flex gap-4 justify-center">
-              <Button variant="outline" onClick={handleCreateAnother}>
-                Create Another
-              </Button>
-              <Button onClick={handleGoToDashboard}>
-                Go to Dashboard
-              </Button>
+
+              {/* Iframe */}
+              <div className="rounded-lg border border-border overflow-hidden" style={{ height: '100vh' }}>
+                <iframe
+                  src={storyPreviewUrl}
+                  className="w-full h-full"
+                  title="Story preview"
+                  loading="lazy"
+                />
+              </div>
             </div>
-          </Card>
+          )}
         </main>
       </div>
     )
