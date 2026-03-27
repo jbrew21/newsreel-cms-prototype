@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video, ChevronDown, Camera } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
+import { Logo } from '@/components/brand/logo'
 import { cn } from '@/lib/utils'
 import type { SlideFormData, BriefFormData, QuizFormData, PollFormData, EditBriefMetadata } from '@/lib/supabase/types'
 import { getFullBriefStory } from '@/lib/supabase/brief'
@@ -750,10 +751,8 @@ export default function CreateContentPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                  <span className="text-primary-foreground text-sm font-bold">N</span>
-                </div>
-                <h1 className="text-xl font-heading text-foreground">{isEditMode ? 'Edit Post' : 'New Post'}</h1>
+                <Logo width={90} height={22} />
+                <h1 className="text-xl font-heading text-foreground">{isEditMode ? 'Edit Story' : 'New Story'}</h1>
               </div>
             </div>
             <div className="flex items-center gap-2">
