@@ -703,20 +703,8 @@ export default function ResponsePage() {
             <div>
               {/* Toggle + actions row */}
               <div className="flex items-center justify-between mb-4">
-                {/* Web | Mobile pill toggle */}
+                {/* Mobile | Web pill toggle */}
                 <div className="inline-flex items-center rounded-full border border-border bg-muted p-1 gap-0.5">
-                  <button
-                    onClick={() => setPreviewTab('web')}
-                    className={cn(
-                      "flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all duration-200",
-                      previewTab === 'web'
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <Monitor className="h-3.5 w-3.5" />
-                    Web App
-                  </button>
                   <button
                     onClick={() => setPreviewTab('mobile')}
                     className={cn(
@@ -728,6 +716,18 @@ export default function ResponsePage() {
                   >
                     <Smartphone className="h-3.5 w-3.5" />
                     Mobile App
+                  </button>
+                  <button
+                    onClick={() => setPreviewTab('web')}
+                    className={cn(
+                      "flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all duration-200",
+                      previewTab === 'web'
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Monitor className="h-3.5 w-3.5" />
+                    Web App
                   </button>
                 </div>
 
