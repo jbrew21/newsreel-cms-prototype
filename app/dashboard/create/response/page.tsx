@@ -44,6 +44,8 @@ export default function ResponsePage() {
   const [savedMode, setSavedMode] = useState<SaveMode | null>(null)
   const [showRepublishModal, setShowRepublishModal] = useState(false)
   const [copiedEmbed, setCopiedEmbed] = useState(false)
+  const [showMobileEmbedModal, setShowMobileEmbedModal] = useState(false)
+  const [copiedMobileEmbed, setCopiedMobileEmbed] = useState(false)
   const [savedStoryFull, setSavedStoryFull] = useState<{ storyData: BriefFormData; editMetadata: EditBriefMetadata } | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [mediaWarnings, setMediaWarnings] = useState<string[]>([])
@@ -601,6 +603,19 @@ export default function ResponsePage() {
     setTimeout(() => setCopiedEmbed(false), 2000)
   }
 
+  const generateMobileEmbedCode = (): string => {
+    if (!savedStoryId) return ''
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://cms.newsreel.co'
+    const src = `${origin}/embed/story/${savedStoryId}`
+    return `<iframe\n  src="${src}"\n  width="480"\n  height="920"\n  style="border:none;border-radius:16px;overflow:hidden;"\n  allow="autoplay"\n  title="Newsreel Story"\n></iframe>`
+  }
+
+  const handleCopyMobileEmbed = () => {
+    navigator.clipboard.writeText(generateMobileEmbedCode())
+    setCopiedMobileEmbed(true)
+    setTimeout(() => setCopiedMobileEmbed(false), 2000)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -629,23 +644,22 @@ export default function ResponsePage() {
                 <ArrowLeft className="h-4 w-4 mr-1.5" />
                 Go to Dashboard
               </Button>
-              <ThemeToggle />
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={handleEditStory} disabled={!savedStoryId}>
+                  <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                  Edit Story
+                </Button>
+                <Button size="sm" onClick={handleCreateAnother}>
+                  <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
+                  Create Another
+                </Button>
+                <ThemeToggle />
+              </div>
             </div>
           </div>
         </header>
 
         <main className="container mx-auto px-4 py-6 max-w-3xl">
-          {/* Action buttons */}
-          <div className="flex items-center justify-end gap-3 mb-5">
-            <Button variant="outline" size="sm" onClick={handleEditStory} disabled={!savedStoryId}>
-              <Pencil className="h-3.5 w-3.5 mr-1.5" />
-              Edit Story
-            </Button>
-            <Button size="sm" onClick={handleCreateAnother}>
-              <PlusCircle className="h-3.5 w-3.5 mr-1.5" />
-              Create Another
-            </Button>
-          </div>
 
           {/* Media warnings */}
           {mediaWarnings.length > 0 && (
@@ -698,13 +712,59 @@ export default function ResponsePage() {
             </DialogContent>
           </Dialog>
 
+          {/* Mobile embed modal */}
+          <Dialog open={showMobileEmbedModal} onOpenChange={setShowMobileEmbedModal}>
+            <DialogContent className="max-w-2xl flex flex-col max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle>Embed mobile preview</DialogTitle>
+                <DialogDescription>
+                  Copy this code to embed the interactive mobile story preview on any webpage.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-auto mt-1">
+                <pre className="text-xs bg-muted rounded-md p-4 overflow-auto whitespace-pre-wrap break-all font-mono leading-relaxed border border-border">
+                  {generateMobileEmbedCode()}
+                </pre>
+              </div>
+              <div className="pt-4 border-t border-border mt-2">
+                <Button
+                  variant={copiedMobileEmbed ? 'outline' : 'default'}
+                  size="sm"
+                  className="w-full"
+                  onClick={handleCopyMobileEmbed}
+                >
+                  {copiedMobileEmbed ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 mr-1.5" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copy code
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           {/* Story preview */}
           {storyPreviewUrl && savedStoryId && (
             <div>
-              {/* Toggle + actions row */}
+              {/* Pill toggle row: pill on left, actions on right */}
               <div className="flex items-center justify-between mb-4">
-                {/* Mobile | Web pill toggle */}
-                <div className="inline-flex items-center rounded-full border border-border bg-muted p-1 gap-0.5">
+                {/* Mobile | Web pill toggle — status badge floats over top-right edge */}
+                <div className="relative inline-flex items-center rounded-full border border-border bg-muted p-1 gap-0.5">
+                  {/* Floating status text */}
+                  <span className={cn(
+                    "absolute -top-4 right-1 z-10 text-[10px] font-medium bg-background px-0.5",
+                    savedMode === 'publish'
+                      ? "text-green-600 dark:text-green-400"
+                      : "text-amber-600 dark:text-amber-400"
+                  )}>
+                    {modeLabel}
+                  </span>
                   <button
                     onClick={() => setPreviewTab('mobile')}
                     className={cn(
@@ -731,29 +791,34 @@ export default function ResponsePage() {
                   </button>
                 </div>
 
-                {/* Status badge + actions */}
-                <div className="flex items-center gap-3">
-                  <span className={cn(
-                    "text-xs font-medium",
-                    savedMode === 'publish' ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
-                  )}>
-                    {modeLabel}
-                  </span>
-                  <button
-                    onClick={() => setShowRepublishModal(true)}
-                    className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    &lt;/&gt; Get republish code
-                  </button>
-                  <a
-                    href={storyPreviewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    See full article
-                    <ExternalLink className="h-3 w-3" />
-                  </a>
+                {/* Actions — right side of pill row */}
+                <div className="flex items-center gap-2">
+                  {previewTab === 'web' ? (
+                    <>
+                      <button
+                        onClick={() => setShowRepublishModal(true)}
+                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md px-3 py-1.5 hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        &lt;/&gt; Get republish code
+                      </button>
+                      <a
+                        href={storyPreviewUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md px-3 py-1.5 hover:bg-muted hover:text-foreground transition-colors"
+                      >
+                        See full article
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => setShowMobileEmbedModal(true)}
+                      className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground border border-border rounded-md px-3 py-1.5 hover:bg-muted hover:text-foreground transition-colors"
+                    >
+                      &lt;/&gt; Get embed code
+                    </button>
+                  )}
                 </div>
               </div>
 
