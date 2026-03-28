@@ -8,7 +8,8 @@ import { saveVerticalVideoPost } from '@/lib/supabase/video-feed'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { ArrowLeft, Check, FileText, Loader2, Video, HelpCircle, BarChart3, Image as ImageIcon, Play, User, ExternalLink, Pencil, PlusCircle, Copy } from 'lucide-react'
+import { ArrowLeft, Check, FileText, Loader2, Video, HelpCircle, BarChart3, Image as ImageIcon, Play, User, ExternalLink, Pencil, PlusCircle, Copy, Monitor, Smartphone } from 'lucide-react'
+import { MobileSlidePreview } from '@/components/preview/mobile-slide-preview'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { Logo } from '@/components/brand/logo'
 import { cn } from '@/lib/utils'
@@ -46,6 +47,7 @@ export default function ResponsePage() {
   const [savedStoryFull, setSavedStoryFull] = useState<{ storyData: BriefFormData; editMetadata: EditBriefMetadata } | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [mediaWarnings, setMediaWarnings] = useState<string[]>([])
+  const [previewTab, setPreviewTab] = useState<'web' | 'mobile'>('web')
   const [previewUrls, setPreviewUrls] = useState<{
     coverUrl: string | null
     slideMediaUrls: Map<string, string[]>
@@ -697,17 +699,46 @@ export default function ResponsePage() {
           </Dialog>
 
           {/* Story preview */}
-          {storyPreviewUrl && (
+          {storyPreviewUrl && savedStoryId && (
             <div>
-              {/* Preview label + actions */}
-              <div className="flex items-center justify-between mb-2 px-0.5">
-                <p className="text-xs text-muted-foreground">
-                  Preview of webapp &middot; <span className={cn(
-                    "font-medium",
-                    savedMode === 'publish' ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
-                  )}>{modeLabel}</span>
-                </p>
+              {/* Toggle + actions row */}
+              <div className="flex items-center justify-between mb-4">
+                {/* Web | Mobile pill toggle */}
+                <div className="inline-flex items-center rounded-full border border-border bg-muted p-1 gap-0.5">
+                  <button
+                    onClick={() => setPreviewTab('web')}
+                    className={cn(
+                      "flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all duration-200",
+                      previewTab === 'web'
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Monitor className="h-3.5 w-3.5" />
+                    Web App
+                  </button>
+                  <button
+                    onClick={() => setPreviewTab('mobile')}
+                    className={cn(
+                      "flex items-center gap-2 rounded-full px-5 py-2 text-sm font-medium transition-all duration-200",
+                      previewTab === 'mobile'
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground"
+                    )}
+                  >
+                    <Smartphone className="h-3.5 w-3.5" />
+                    Mobile App
+                  </button>
+                </div>
+
+                {/* Status badge + actions */}
                 <div className="flex items-center gap-3">
+                  <span className={cn(
+                    "text-xs font-medium",
+                    savedMode === 'publish' ? "text-green-600 dark:text-green-400" : "text-amber-600 dark:text-amber-400"
+                  )}>
+                    {modeLabel}
+                  </span>
                   <button
                     onClick={() => setShowRepublishModal(true)}
                     className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
@@ -726,15 +757,24 @@ export default function ResponsePage() {
                 </div>
               </div>
 
-              {/* Iframe */}
-              <div className="rounded-lg border border-border overflow-hidden" style={{ height: '100vh' }}>
-                <iframe
-                  src={storyPreviewUrl}
-                  className="w-full h-full"
-                  title="Story preview"
-                  loading="lazy"
-                />
-              </div>
+              {/* Web App preview */}
+              {previewTab === 'web' && (
+                <div className="rounded-lg border border-border overflow-hidden" style={{ height: '100vh' }}>
+                  <iframe
+                    src={storyPreviewUrl}
+                    className="w-full h-full"
+                    title="Story preview"
+                    loading="lazy"
+                  />
+                </div>
+              )}
+
+              {/* Mobile App preview */}
+              {previewTab === 'mobile' && (
+                <div className="flex justify-center py-6">
+                  <MobileSlidePreview storyId={savedStoryId} />
+                </div>
+              )}
             </div>
           )}
         </main>
