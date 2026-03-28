@@ -49,7 +49,7 @@ export default function ResponsePage() {
   const [savedStoryFull, setSavedStoryFull] = useState<{ storyData: BriefFormData; editMetadata: EditBriefMetadata } | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [mediaWarnings, setMediaWarnings] = useState<string[]>([])
-  const [previewTab, setPreviewTab] = useState<'web' | 'mobile'>('web')
+  const [previewTab, setPreviewTab] = useState<'web' | 'mobile'>('mobile')
   const [previewUrls, setPreviewUrls] = useState<{
     coverUrl: string | null
     slideMediaUrls: Map<string, string[]>

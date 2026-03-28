@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
@@ -322,14 +323,25 @@ function StoryIntroSlide({ story }: { story: CmsStory }) {
         display: 'flex', flexDirection: 'column',
       }}
     >
-      {/* 1:1 hero image */}
+      {/* 1:1 hero — image or video */}
       {story.cover?.url && (
         <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: 12, overflow: 'hidden', marginBottom: 8, flexShrink: 0 }}>
-          <img
-            src={story.cover.url}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-          />
+          {story.cover.media_type === 'video' ? (
+            <video
+              src={story.cover.url}
+              autoPlay
+              loop
+              muted
+              playsInline
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          ) : (
+            <img
+              src={story.cover.url}
+              alt=""
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+            />
+          )}
         </div>
       )}
 
