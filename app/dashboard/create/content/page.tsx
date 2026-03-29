@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video, ChevronDown, Camera } from 'lucide-react'
+import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video, ChevronDown, Camera, Smartphone } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { Logo } from '@/components/brand/logo'
 import { cn } from '@/lib/utils'
@@ -22,6 +22,8 @@ import { AIStoryGenerator } from '@/components/ai-story-generator'
 import { BackgroundSelectorModal, VideoRecorderModal, AuthorVideoPreview } from '@/components/video-recorder'
 import type { BackgroundConfig } from '@/hooks/use-video-compositor'
 import { AIQuizPollRecommender } from '@/components/ai-quiz-poll-recommender'
+import { MobileSlidePreviewRenderer } from '@/components/preview/mobile-slide-preview'
+import { briefFormToCmsStory } from '@/components/preview/brief-to-preview-adapter'
 import dynamic from 'next/dynamic'
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false })
@@ -32,6 +34,7 @@ interface Author {
   author_last_name: string | null
   author_bio: string | null
   author_email: string | null
+  author_avatar: string | null
   created_at: string | null
 }
 
@@ -124,6 +127,9 @@ export default function CreateContentPage() {
   // AI Quiz/Poll Recommender modal
   const [aiRecommenderOpen, setAiRecommenderOpen] = useState(false)
   const [aiRecommenderType, setAiRecommenderType] = useState<'quiz' | 'poll'>('quiz')
+
+  // Mobile preview panel
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false)
 
   // Drag and drop state
   const [draggedSlideId, setDraggedSlideId] = useState<string | null>(null)
@@ -300,6 +306,26 @@ export default function CreateContentPage() {
     }
     return user?.email?.split('@')[0] || 'Author'
   }
+
+  // Live preview: convert current form state → CmsStory for the phone renderer
+  const authorVideoPreviewUrls = useMemo(() => {
+    const map = new Map<string, string>()
+    authorVideos.forEach((v, slideId) => map.set(slideId, v.previewUrl))
+    return map
+  }, [authorVideos])
+
+  const previewStory = useMemo(
+    () =>
+      briefFormToCmsStory(storyData, {
+        coverPreviewUrl: headlinePhotoPreview || storyData.headlinePhotoUrl || null,
+        coverFile: storyData.headlinePhoto,
+        slideMediaPreviewUrls: slideMediaPreviews,
+        authorVideoUrls: authorVideoPreviewUrls,
+        storyHeadlineVideoUrl: storyHeadlineVideo?.previewUrl || null,
+        authorAvatarUrl: author?.author_avatar || null,
+      }),
+    [storyData, headlinePhotoPreview, slideMediaPreviews, authorVideoPreviewUrls, storyHeadlineVideo, author],
+  )
 
   const handleAIGenerated = (draftState: any) => {
     setStoryData(prev => ({
@@ -1866,6 +1892,73 @@ export default function CreateContentPage() {
         onPollSelected={handlePollSelected}
         type={aiRecommenderType}
       />
+
+      {/* Mobile Preview — fixed button, top-right of content area */}
+      <button
+        onClick={() => setMobilePreviewOpen(true)}
+        className={cn(
+          'fixed right-8 top-[160px] z-40',
+          'flex items-center gap-2.5 px-5 py-2.5 rounded-lg',
+          'border border-border bg-card text-foreground shadow-md',
+          'hover:bg-muted transition-colors',
+          'hidden xl:flex',
+        )}
+      >
+        <Smartphone className="h-4 w-4 text-primary" />
+        <span className="text-sm font-medium">Mobile Preview</span>
+      </button>
+
+      {/* Mobile Preview — small screen fallback (bottom-right, above footer) */}
+      <button
+        onClick={() => setMobilePreviewOpen(true)}
+        className={cn(
+          'fixed right-4 bottom-20 z-40',
+          'flex items-center justify-center w-12 h-12 rounded-full',
+          'bg-primary text-primary-foreground shadow-lg',
+          'hover:bg-primary/90 transition-all',
+          'xl:hidden',
+        )}
+        aria-label="Mobile Preview"
+      >
+        <Smartphone className="h-5 w-5" />
+      </button>
+
+      {/* Mobile Preview Slide-out Panel */}
+      {mobilePreviewOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => setMobilePreviewOpen(false)}
+          />
+          {/* Panel */}
+          <div className="relative w-full max-w-[560px] bg-background border-l border-border shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <Smartphone className="h-4 w-4 text-primary" />
+                <span className="text-sm font-semibold text-foreground">Mobile Preview</span>
+              </div>
+              <button
+                onClick={() => setMobilePreviewOpen(false)}
+                className="flex items-center justify-center w-8 h-8 rounded-full hover:bg-muted transition-colors"
+                aria-label="Close preview"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            {/* Phone preview — large, vertically scrollable */}
+            <div className="flex-1 overflow-y-auto flex items-start justify-center py-8 px-6">
+              <MobileSlidePreviewRenderer story={previewStory} />
+            </div>
+            <div className="px-5 py-3 border-t border-border flex-shrink-0">
+              <p className="text-xs text-muted-foreground text-center">
+                Live preview &mdash; updates as you edit
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Back Confirmation Modal */}
       {showBackConfirm && (

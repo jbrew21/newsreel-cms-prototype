@@ -711,73 +711,37 @@ function SlideDispatcher({ virtualSlide, story }: { virtualSlide: VirtualSlide; 
   return null
 }
 
-// ─── Main Export ──────────────────────────────────────────────────────────────
+// ─── Pure Renderer (prop-driven, no fetch) ───────────────────────────────────
 
-interface MobileSlidePreviewProps {
-  storyId: string
+export { type CmsStory }
+
+interface MobileSlidePreviewRendererProps {
+  story: CmsStory
 }
 
-export function MobileSlidePreview({ storyId }: MobileSlidePreviewProps) {
-  const [story, setStory] = useState<CmsStory | null>(null)
-  const [loadingStory, setLoadingStory] = useState(true)
-  const [fetchError, setFetchError] = useState<string | null>(null)
+export function MobileSlidePreviewRenderer({ story }: MobileSlidePreviewRendererProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
-  useEffect(() => {
-    setLoadingStory(true)
-    setFetchError(null)
-    fetch(`/api/stories/${storyId}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.story) setStory(data.story)
-        else setFetchError('Story not found')
-      })
-      .catch(() => setFetchError('Failed to load preview'))
-      .finally(() => setLoadingStory(false))
-  }, [storyId])
-
-  const virtualSlides: VirtualSlide[] = story
-    ? [
-        { type: 'intro', key: 'intro' },
-        ...story.slides.map((s) => ({ type: 'content' as const, slide: s, key: s.id })),
-        ...(story.quiz ? [{ type: 'quiz' as const, quiz: story.quiz, key: 'quiz' as const }] : []),
-        ...(story.poll ? [{ type: 'poll' as const, poll: story.poll, key: 'poll' as const }] : []),
-      ]
-    : []
+  const virtualSlides: VirtualSlide[] = [
+    { type: 'intro', key: 'intro' },
+    ...story.slides.map((s) => ({ type: 'content' as const, slide: s, key: s.id })),
+    ...(story.quiz ? [{ type: 'quiz' as const, quiz: story.quiz, key: 'quiz' as const }] : []),
+    ...(story.poll ? [{ type: 'poll' as const, poll: story.poll, key: 'poll' as const }] : []),
+  ]
 
   const total = virtualSlides.length
 
   const goPrev = useCallback(() => setCurrentIndex((i) => Math.max(0, i - 1)), [])
   const goNext = useCallback(() => setCurrentIndex((i) => Math.min(total - 1, i + 1)), [total])
 
+  // Clamp index if slides change (e.g. user removes a slide while preview is open)
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') goPrev()
-      if (e.key === 'ArrowRight') goNext()
+    if (total > 0 && currentIndex >= total) {
+      setCurrentIndex(total - 1)
     }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [goPrev, goNext])
+  }, [total, currentIndex])
 
-  useEffect(() => { setCurrentIndex(0) }, [storyId])
-
-  if (loadingStory) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (fetchError || !story) {
-    return (
-      <div className="flex items-center justify-center py-24 text-sm text-muted-foreground">
-        {fetchError ?? 'Could not load preview'}
-      </div>
-    )
-  }
-
-  if (!virtualSlides.length) {
+  if (!total) {
     return (
       <div className="flex items-center justify-center py-24 text-sm text-muted-foreground">
         No slides to preview
@@ -789,7 +753,30 @@ export function MobileSlidePreview({ storyId }: MobileSlidePreviewProps) {
   const progress = (currentIndex + 1) / total
 
   return (
-    <div className="flex flex-col items-center gap-5">
+    <div className="flex flex-col items-center gap-4">
+      {/* Navigation controls — above the phone */}
+      <div className="flex items-center gap-4">
+        <button
+          onClick={goPrev}
+          disabled={currentIndex === 0}
+          className={cn('flex h-8 w-8 items-center justify-center rounded-full border border-border transition-colors', 'hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30')}
+          aria-label="Previous slide"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        <span className="min-w-[80px] text-center text-sm tabular-nums text-muted-foreground">
+          Slide {currentIndex + 1} of {total}
+        </span>
+        <button
+          onClick={goNext}
+          disabled={currentIndex === total - 1}
+          className={cn('flex h-8 w-8 items-center justify-center rounded-full border border-border transition-colors', 'hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30')}
+          aria-label="Next slide"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+
       {/* Phone frame */}
       <div
         style={{
@@ -819,29 +806,49 @@ export function MobileSlidePreview({ storyId }: MobileSlidePreviewProps) {
           <SlideDispatcher key={currentVSlide.key} virtualSlide={currentVSlide} story={story} />
         </div>
       </div>
-
-      {/* Navigation controls */}
-      <div className="flex items-center gap-4">
-        <button
-          onClick={goPrev}
-          disabled={currentIndex === 0}
-          className={cn('flex h-8 w-8 items-center justify-center rounded-full border border-border transition-colors', 'hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30')}
-          aria-label="Previous slide"
-        >
-          <ChevronLeft className="h-4 w-4" />
-        </button>
-        <span className="min-w-[80px] text-center text-sm tabular-nums text-muted-foreground">
-          Slide {currentIndex + 1} of {total}
-        </span>
-        <button
-          onClick={goNext}
-          disabled={currentIndex === total - 1}
-          className={cn('flex h-8 w-8 items-center justify-center rounded-full border border-border transition-colors', 'hover:bg-muted disabled:cursor-not-allowed disabled:opacity-30')}
-          aria-label="Next slide"
-        >
-          <ChevronRight className="h-4 w-4" />
-        </button>
-      </div>
     </div>
   )
+}
+
+// ─── Fetch Wrapper (used on response page) ───────────────────────────────────
+
+interface MobileSlidePreviewProps {
+  storyId: string
+}
+
+export function MobileSlidePreview({ storyId }: MobileSlidePreviewProps) {
+  const [story, setStory] = useState<CmsStory | null>(null)
+  const [loadingStory, setLoadingStory] = useState(true)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoadingStory(true)
+    setFetchError(null)
+    fetch(`/api/stories/${storyId}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.story) setStory(data.story)
+        else setFetchError('Story not found')
+      })
+      .catch(() => setFetchError('Failed to load preview'))
+      .finally(() => setLoadingStory(false))
+  }, [storyId])
+
+  if (loadingStory) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (fetchError || !story) {
+    return (
+      <div className="flex items-center justify-center py-24 text-sm text-muted-foreground">
+        {fetchError ?? 'Could not load preview'}
+      </div>
+    )
+  }
+
+  return <MobileSlidePreviewRenderer story={story} />
 }
