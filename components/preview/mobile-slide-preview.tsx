@@ -713,7 +713,7 @@ function SlideDispatcher({ virtualSlide, story }: { virtualSlide: VirtualSlide; 
 
 // ─── Pure Renderer (prop-driven, no fetch) ───────────────────────────────────
 
-export { type CmsStory }
+export { type CmsStory, type CmsSlide }
 
 interface MobileSlidePreviewRendererProps {
   story: CmsStory
