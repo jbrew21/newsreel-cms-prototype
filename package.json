@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.81.0",
     "@mediapipe/selfie_segmentation": "^0.1.1675465747",
     "@radix-ui/react-checkbox": "^1.1.0",
     "@radix-ui/react-dialog": "^1.1.15",

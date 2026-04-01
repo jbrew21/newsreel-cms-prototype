@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
-import { Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, BarChart3, Globe, EyeOff, RefreshCw, ChevronDown } from 'lucide-react'
+import { Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, BarChart3, Wand2, Globe, EyeOff, RefreshCw, ChevronDown } from 'lucide-react'
 import { deleteStory } from '@/lib/supabase/brief'
 import { cn } from '@/lib/utils'
-import { Sidebar, MobileHeader, TabContent, type TabId } from '@/components/dashboard'
+import { Sidebar, MobileHeader, TabContent, TransformTab, type TabId } from '@/components/dashboard'
 import { AnalyticsDashboard } from '@/components/analytics'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -569,6 +569,7 @@ export default function DashboardPage() {
     { id: 'published' as TabId, label: 'Published', count: publishedContent.length },
     { id: 'all' as TabId, label: 'All', visible: isInternalTeam },
     { id: 'analytics' as TabId, label: 'Analytics', icon: <BarChart3 className="h-3.5 w-3.5" /> },
+    { id: 'transform' as TabId, label: 'Transform', icon: <Wand2 className="h-3.5 w-3.5" /> },
   ]
 
   const greeting = getGreeting()
@@ -600,7 +601,8 @@ export default function DashboardPage() {
       <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
         <div className="max-w-5xl mx-auto px-6 md:px-8 py-8 md:py-10">
 
-          {/* Greeting + Role badge + Stats */}
+          {/* Greeting + Role badge + Stats (hidden on Transform tab) */}
+          {activeTab !== 'transform' && (
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-1">
               <h1 className="text-foreground text-2xl font-heading">
@@ -633,6 +635,7 @@ export default function DashboardPage() {
               )}
             </div>
           </div>
+          )}
 
           {/* ── Drafts Tab ───────────────────────────────────────── */}
           <TabContent id="drafts" active={activeTab === 'drafts'}>
@@ -869,6 +872,11 @@ export default function DashboardPage() {
                 authorName={getAuthorName()}
               />
             )}
+          </TabContent>
+
+          {/* ── Transform Tab ──────────────────────────────────────── */}
+          <TabContent id="transform" active={activeTab === 'transform'}>
+            <TransformTab />
           </TabContent>
 
         </div>

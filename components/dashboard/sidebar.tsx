@@ -1,14 +1,14 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Plus, LogOut, Users, Pencil, FileText, BarChart3, ChevronDown } from 'lucide-react'
+import { Plus, LogOut, Users, Pencil, FileText, BarChart3, Wand2, ChevronDown } from 'lucide-react'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type TabId = 'drafts' | 'published' | 'all' | 'analytics'
+export type TabId = 'drafts' | 'published' | 'all' | 'analytics' | 'transform'
 
 export interface NavItem {
   id: TabId
@@ -103,7 +103,7 @@ export function Sidebar({
           {/* Stories — top-level tab with sub-tabs */}
           {(() => {
             const isStoriesActive = activeTab === 'drafts' || activeTab === 'published' || activeTab === 'all'
-            const storySubItems = navItems.filter(item => item.id !== 'analytics' && item.visible !== false)
+            const storySubItems = navItems.filter(item => item.id !== 'analytics' && item.id !== 'transform' && item.visible !== false)
 
             return (
               <div>
@@ -178,6 +178,23 @@ export function Sidebar({
           >
             <BarChart3 className="h-3.5 w-3.5" />
             Analytics
+          </button>
+
+          {/* Transform — top-level tab */}
+          <button
+            onClick={() => {
+              onTabChange('transform')
+              onClose()
+            }}
+            className={cn(
+              'w-full flex items-center gap-2 px-3 py-2.5 rounded-lg text-sm transition-all duration-200',
+              activeTab === 'transform'
+                ? 'bg-accent text-accent-foreground font-medium'
+                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+            )}
+          >
+            <Wand2 className="h-3.5 w-3.5" />
+            Transform
           </button>
         </nav>
 
