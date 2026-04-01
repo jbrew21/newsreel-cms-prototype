@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Link2, ArrowRight, RotateCcw, Pencil, Image as ImageIcon, Type, BarChart3, Check, ChevronLeft, ChevronRight, Camera } from 'lucide-react'
+import { Link2, ArrowRight, RotateCcw, Pencil, Image as ImageIcon, Type, BarChart3, Check, ChevronLeft, ChevronRight, Camera, Copy, Loader2, Code2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { MobileSlidePreviewRenderer } from '@/components/preview/mobile-slide-preview'
 import type { CmsStory, CmsSlide } from '@/components/preview/mobile-slide-preview'
 import { MediaPickerModal } from '@/components/media-picker-modal'
 import { MediaSearchModal } from '@/components/media-search-modal'
@@ -11,6 +10,11 @@ import { BackgroundSelectorModal } from '@/components/video-recorder/background-
 import { VideoRecorderModal } from '@/components/video-recorder/video-recorder-modal'
 import type { BackgroundConfig } from '@/hooks/use-video-compositor'
 import type { MediaItem } from '@/lib/media-search/types'
+import { supabase } from '@/lib/supabase/client'
+import { saveBriefPost } from '@/lib/supabase/brief'
+import type { BriefFormData } from '@/lib/supabase/types'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import dynamic from 'next/dynamic'
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false })
@@ -53,6 +57,7 @@ interface MediaResult {
   thumbnail: string
   source: string
   mediaType: 'image' | 'video'
+  attribution: string | null
 }
 
 async function fetchSlideMedia(
@@ -113,7 +118,9 @@ function transformToCmsStory(
       slide_headline_2: null,
       slide_content_2: null,
       slide_quote: null,
-      slide_media_source: null,
+      slide_media_source: slideMedia.has(i)
+        ? (slideMedia.get(i)!.attribution || slideMedia.get(i)!.source || null)
+        : null,
       portrait_video: false,
       media: slideMedia.has(i)
         ? [{ url: slideMedia.get(i)!.url, media_type: slideMedia.get(i)!.mediaType, role: 'hero' }]
@@ -137,6 +144,62 @@ function transformToCmsStory(
           econ_weight: null,
           social_weight: null,
           importance: null,
+        }
+      : null,
+  }
+}
+
+// ─── Convert CmsStory → BriefFormData for saving ────────────────────────────
+
+function cmsStoryToBriefFormData(
+  story: CmsStory,
+  authorId: string | null,
+  authorName: string,
+): BriefFormData {
+  return {
+    story_headline: story.story_headline || '',
+    subhead: story.subhead || null,
+    headlinePhoto: null,
+    headlinePhotoUrl: story.cover?.url || undefined,
+    author_id: authorId,
+    author_name: authorName,
+    story_type: 'Brief',
+    story_date: null,
+    is_k12: false,
+    is_premium: false,
+    story_media_source: story.story_media_source || null,
+    allowed_domains: null,
+    slides: story.slides.map((slide, i) => {
+      const heroMedia = slide.media.find((m) => m.role === 'hero') ?? slide.media[0] ?? null
+      return {
+        id: slide.id,
+        slideIndex: i,
+        slide_headline_1: slide.slide_headline_1 || undefined,
+        slide_content_1: slide.slide_content_1 || undefined,
+        slide_headline_2: slide.slide_headline_2 || undefined,
+        slide_content_2: slide.slide_content_2 || undefined,
+        slide_quote: slide.slide_quote || undefined,
+        slide_media_source: slide.slide_media_source || undefined,
+        portrait_video: slide.portrait_video,
+        mediaFiles: [],
+        savedMediaUrls: heroMedia ? [heroMedia.url] : [],
+      }
+    }),
+    quiz: story.quiz
+      ? {
+          quiz_content: story.quiz.question,
+          quiz_answer_a: story.quiz.answer_a || '',
+          quiz_answer_b: story.quiz.answer_b || '',
+          quiz_answer_c: story.quiz.answer_c || '',
+          quiz_answer_d: story.quiz.answer_d || '',
+        }
+      : null,
+    poll: story.poll
+      ? {
+          question: story.poll.question,
+          econ_weight: story.poll.econ_weight,
+          social_weight: story.poll.social_weight,
+          importance: story.poll.importance,
         }
       : null,
   }
@@ -345,6 +408,239 @@ function EditableContentSlide({
   )
 }
 
+// ─── Carousel slide renderers (read-only) ───────────────────────────────────
+
+function CarouselIntroContent({ story }: { story: CmsStory }) {
+  return (
+    <div
+      style={{
+        position: 'absolute', inset: 0, background: '#000000',
+        overflowY: 'auto', overflowX: 'hidden',
+        paddingTop: 80, paddingBottom: 48, paddingLeft: 16, paddingRight: 16,
+        display: 'flex', flexDirection: 'column',
+      }}
+    >
+      {story.cover?.url && (
+        <div style={{ width: '100%', aspectRatio: '1/1', borderRadius: 12, overflow: 'hidden', marginBottom: 8, flexShrink: 0 }}>
+          {story.cover.media_type === 'video' ? (
+            <video src={story.cover.url} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={story.cover.url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          )}
+        </div>
+      )}
+      <p style={{ fontSize: 12, color: '#F0F0F0', textAlign: 'center', fontFamily: '"DM Sans",sans-serif', fontWeight: 400, margin: 0, marginBottom: 24, minHeight: 16 }}>
+        {story.story_media_source ?? ''}
+      </p>
+      <h2 style={{ fontSize: 32, lineHeight: '1.25', fontWeight: 700, color: '#FFFFFF', textAlign: 'center', fontFamily: 'var(--font-playfair),Georgia,"Times New Roman",serif', margin: 0, marginBottom: 30 }}>
+        {story.story_headline}
+      </h2>
+      {story.subhead && (
+        <p style={{ fontSize: 15, lineHeight: '1.5', color: 'rgba(255,255,255,0.75)', textAlign: 'center', fontFamily: '"DM Sans",sans-serif', fontWeight: 400, margin: 0, marginBottom: 24 }}>
+          {story.subhead}
+        </p>
+      )}
+      {story.partner_name && (
+        <div style={{ marginTop: 20, textAlign: 'center' }}>
+          <span style={{ fontSize: 12, color: '#F0F0F0', fontFamily: '"DM Sans",sans-serif' }}>
+            Read full story on{' '}
+            <span style={{ color: '#FF6343', fontWeight: 700, textDecoration: 'underline' }}>
+              {story.partner_name}
+            </span>
+          </span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CarouselSlideContent({ slide }: { slide: CmsSlide }) {
+  const heroMedia = slide.media.find((m) => m.role === 'hero') ?? slide.media[0] ?? null
+  const isVideo = heroMedia?.media_type === 'video'
+  const hasContent1 = !!slide.slide_content_1
+  const headline = hasContent1 ? slide.slide_headline_1 : slide.slide_headline_2
+  const body = hasContent1 ? slide.slide_content_1 : slide.slide_content_2
+
+  return (
+    <>
+      {heroMedia && (
+        <>
+          {isVideo ? (
+            <video src={heroMedia.url} autoPlay loop muted playsInline style={{ position: 'absolute', top: 64, left: 0, width: '100%', height: 'calc(100% - 64px)', objectFit: 'cover', zIndex: 0 }} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={heroMedia.url} alt="" style={{ position: 'absolute', top: 64, left: 0, width: '100%', height: 'calc(100% - 64px)', objectFit: 'cover', zIndex: 0 }} />
+          )}
+          <div style={{ position: 'absolute', top: 64, left: 0, right: 0, bottom: 0, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)', background: 'rgba(0,0,0,0.6)', zIndex: 1, pointerEvents: 'none' }} />
+        </>
+      )}
+      {heroMedia && (
+        <div style={{ position: 'absolute', top: 130, left: 0, right: 0, zIndex: 5 }}>
+          {isVideo ? (
+            <video src={heroMedia.url} autoPlay loop muted playsInline style={{ width: '100%', aspectRatio: '16/9', objectFit: 'cover', display: 'block' }} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={heroMedia.url} alt="" style={{ width: '100%', objectFit: 'contain', display: 'block' }} />
+          )}
+        </div>
+      )}
+      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'flex-start', paddingBottom: 80, paddingLeft: 16, paddingRight: 16, zIndex: 10 }}>
+        <div style={{ background: 'rgba(30,58,95,0.4)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)', borderRadius: 16, padding: 16, maxWidth: '87%', boxShadow: '0 4px 8px rgba(0,0,0,0.4)', marginBottom: 16 }}>
+          {headline && (
+            <p style={{ fontSize: 20.8, lineHeight: '27.2px', fontWeight: 700, color: '#FFF', fontFamily: '"DM Sans",sans-serif', margin: 0, marginBottom: body ? 16 : 0 }}>
+              {headline}
+            </p>
+          )}
+          {body && (
+            <p style={{ fontSize: 16, lineHeight: '21.6px', fontWeight: 400, color: '#FFF', fontFamily: '"DM Sans",sans-serif', margin: 0 }}>
+              {body}
+            </p>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+function CarouselQuizContent({ quiz }: { quiz: NonNullable<CmsStory['quiz']> }) {
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, background: '#000000',
+      overflowY: 'auto', overflowX: 'hidden',
+      paddingTop: 80, paddingBottom: 80, paddingLeft: 20, paddingRight: 20,
+      display: 'flex', flexDirection: 'column',
+    }}>
+      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', textAlign: 'center', fontFamily: '"DM Sans",sans-serif', marginBottom: 16, marginTop: 0 }}>Quiz</p>
+      <p style={{ fontSize: 18, lineHeight: '1.55', color: '#F0F0F0', textAlign: 'center', fontFamily: '"DM Sans",sans-serif', margin: 0, marginBottom: 24 }}>
+        {quiz.question}
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {(['answer_a', 'answer_b', 'answer_c', 'answer_d'] as const).map((key, i) => {
+          const val = quiz[key]
+          if (!val) return null
+          return (
+            <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#1F1F1F', border: '1px solid #898989', borderRadius: 12, padding: '12px 14px' }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#FFF', fontFamily: '"DM Sans",sans-serif', flexShrink: 0 }}>
+                {String.fromCharCode(65 + i)}.
+              </span>
+              <span style={{ fontSize: 14, lineHeight: '1.4', color: '#FFF', fontFamily: '"DM Sans",sans-serif' }}>{val}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+const CAROUSEL_POLL_LABELS = ['Strongly\nDisagree', 'Disagree', 'Neutral', 'Agree', 'Strongly\nAgree']
+const CAROUSEL_POLL_DATA = [8, 15, 23, 46, 8]
+
+function CarouselPollContent({ poll }: { poll: NonNullable<CmsStory['poll']> }) {
+  const [selected, setSelected] = useState<number | null>(null)
+  const [submitted, setSubmitted] = useState(false)
+  const trackRef = useRef<HTMLDivElement>(null)
+
+  const selectPosition = (pos: number) => {
+    setSelected(pos)
+    setSubmitted(true)
+  }
+
+  const handleTrackClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = trackRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = (e.clientX - rect.left) / rect.width
+    selectPosition(Math.max(0, Math.min(4, Math.round(x * 4))))
+  }
+
+  const maxPct = Math.max(...CAROUSEL_POLL_DATA)
+
+  return (
+    <div style={{
+      position: 'absolute', inset: 0, background: '#000000',
+      overflowY: 'auto', overflowX: 'hidden',
+      paddingTop: 80, paddingBottom: 40, paddingLeft: 20, paddingRight: 20,
+      display: 'flex', flexDirection: 'column',
+    }}>
+      <p style={{ fontSize: 28, lineHeight: '1.2', fontWeight: 700, color: '#FFFFFF', textAlign: 'center', fontFamily: 'var(--font-playfair),Georgia,"Times New Roman",serif', margin: 0, marginBottom: 16 }}>
+        Where do you stand?
+      </p>
+      <p style={{ fontSize: 16, lineHeight: '1.55', color: '#F0F0F0', textAlign: 'center', fontFamily: '"DM Sans",sans-serif', fontWeight: 400, margin: 0, marginBottom: 28 }}>
+        {poll.question}
+      </p>
+
+      {/* Bar chart */}
+      <div style={{ height: 160, display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', marginBottom: 16, gap: 4 }}>
+        {CAROUSEL_POLL_DATA.map((pct, i) => (
+          <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', gap: 4, height: '100%' }}>
+            <span style={{ fontSize: 12, color: '#FFF', fontWeight: 600, fontFamily: '"DM Sans",sans-serif', opacity: submitted ? 1 : 0, transition: 'opacity 0.3s ease 0.2s' }}>
+              {pct}%
+            </span>
+            <div style={{
+              width: '60%',
+              height: submitted ? `${Math.max(8, (pct / maxPct) * 120)}px` : '4px',
+              background: i === selected ? '#FFD700' : 'rgba(255,255,255,0.3)',
+              borderRadius: 4,
+              transition: 'height 0.5s ease, background 0.3s ease',
+            }} />
+          </div>
+        ))}
+      </div>
+
+      {/* Slider track */}
+      <div
+        ref={trackRef}
+        onClick={handleTrackClick}
+        style={{ background: '#1F1F1F', borderRadius: 8, height: 85, position: 'relative', cursor: 'pointer', marginBottom: 12, userSelect: 'none' }}
+      >
+        <div style={{ position: 'absolute', top: '50%', left: 12, right: 12, height: 1, background: '#FFD700', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+        {[0, 1, 2, 3, 4].map((pos) => {
+          const isSelected = selected === pos
+          const leftPct = pos === 0 ? 0 : pos === 4 ? 100 : (pos / 4) * 100
+          const leftAdjust = pos === 0 ? 12 : pos === 4 ? -12 : 0
+          return (
+            <div
+              key={pos}
+              style={{
+                position: 'absolute', top: '50%',
+                left: `calc(${leftPct}% + ${leftAdjust}px)`,
+                transform: 'translateX(-50%) translateY(-50%)',
+                width: isSelected ? 8 : 2, height: isSelected ? 28 : 18,
+                background: isSelected ? '#FFD700' : 'rgba(255,255,255,0.3)',
+                borderRadius: 2, transition: 'all 0.2s ease', pointerEvents: 'none',
+              }}
+            />
+          )
+        })}
+      </div>
+
+      {/* Labels */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+        {CAROUSEL_POLL_LABELS.map((label, i) => (
+          <span key={i} style={{
+            fontSize: 10, textAlign: 'center',
+            color: selected === i ? '#FFD700' : 'rgba(255,255,255,0.6)',
+            fontFamily: '"DM Sans",sans-serif', fontWeight: selected === i ? 600 : 400,
+            maxWidth: 52, lineHeight: '1.2', whiteSpace: 'pre-line', transition: 'color 0.2s ease',
+          }}>
+            {label}
+          </span>
+        ))}
+      </div>
+
+      {/* Prompt */}
+      <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', textAlign: 'center', fontFamily: '"DM Sans",sans-serif', fontStyle: 'italic', margin: 0, marginBottom: submitted ? 10 : 0 }}>
+        {submitted ? 'Tap or slide to change your response' : 'Tap to select your response'}
+      </p>
+      {submitted && (
+        <p style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center', fontFamily: '"DM Sans",sans-serif', margin: 0 }}>
+          1,247 people have answered this poll
+        </p>
+      )}
+    </div>
+  )
+}
+
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export function TransformTab() {
@@ -360,6 +656,7 @@ export function TransformTab() {
   // ─── Edit mode state ────────────────────────────────────────────────────
   const [isEditing, setIsEditing] = useState(false)
   const [editSlideIndex, setEditSlideIndex] = useState(0)
+  const [carouselIndex, setCarouselIndex] = useState(0)
 
   // Media picker / search modal state
   const [mediaPickerOpen, setMediaPickerOpen] = useState(false)
@@ -371,6 +668,39 @@ export function TransformTab() {
   const [bgSearchOpen, setBgSearchOpen] = useState(false)
   const [recorderOpen, setRecorderOpen] = useState(false)
   const [recorderBackground, setRecorderBackground] = useState<BackgroundConfig>({ type: 'none' })
+
+  // ─── Embed / save-as-draft state ───────────────────────────────────────
+  const [userId, setUserId] = useState<string | null>(null)
+  const [authorId, setAuthorId] = useState<string | null>(null)
+  const [authorName, setAuthorName] = useState('')
+  const [isSavingDraft, setIsSavingDraft] = useState(false)
+  const [savedStoryId, setSavedStoryId] = useState<string | null>(null)
+  const [showEmbedModal, setShowEmbedModal] = useState(false)
+  const [copiedEmbed, setCopiedEmbed] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
+
+  // Fetch logged-in user + author record
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      setUserId(user.id)
+      if (user.email) {
+        supabase
+          .from('authors')
+          .select('id, author_first_name, author_last_name')
+          .eq('author_email', user.email)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (data) {
+              setAuthorId(data.id)
+              setAuthorName(
+                [data.author_first_name, data.author_last_name].filter(Boolean).join(' ') || ''
+              )
+            }
+          })
+      }
+    })
+  }, [])
 
   useEffect(() => {
     fetch('/animations/Loading.json')
@@ -461,7 +791,58 @@ export function TransformTab() {
     setIsTransforming(false)
     setIsEditing(false)
     setEditSlideIndex(0)
+    setCarouselIndex(0)
+    setSavedStoryId(null)
+    setSaveError(null)
   }, [])
+
+  // ─── Save as draft & get embed code ────────────────────────────────────
+
+  const handleGetEmbedCode = useCallback(async () => {
+    // If already saved, just open the modal
+    if (savedStoryId) {
+      setShowEmbedModal(true)
+      return
+    }
+
+    if (!previewStory || !userId) return
+
+    setIsSavingDraft(true)
+    setSaveError(null)
+
+    try {
+      const draftData = cmsStoryToBriefFormData(previewStory, authorId, authorName)
+      const result = await saveBriefPost({
+        mode: 'draft',
+        draftState: draftData,
+        userId,
+      })
+
+      if (result.success) {
+        setSavedStoryId(result.storyId)
+        setShowEmbedModal(true)
+      } else {
+        setSaveError(result.error || 'Failed to save draft')
+      }
+    } catch (err) {
+      setSaveError((err as Error).message || 'Something went wrong')
+    } finally {
+      setIsSavingDraft(false)
+    }
+  }, [savedStoryId, previewStory, userId, authorId, authorName])
+
+  const generateMobileEmbedCode = useCallback((): string => {
+    if (!savedStoryId) return ''
+    const origin = typeof window !== 'undefined' ? window.location.origin : 'https://cms.newsreel.co'
+    const src = `${origin}/embed/story/${savedStoryId}`
+    return `<iframe\n  src="${src}"\n  width="480"\n  height="920"\n  style="border:none;border-radius:16px;overflow:hidden;"\n  allow="autoplay"\n  title="Newsreel Story"\n></iframe>`
+  }, [savedStoryId])
+
+  const handleCopyEmbed = useCallback(() => {
+    navigator.clipboard.writeText(generateMobileEmbedCode())
+    setCopiedEmbed(true)
+    setTimeout(() => setCopiedEmbed(false), 2000)
+  }, [generateMobileEmbedCode])
 
   // ─── Edit mode helpers ──────────────────────────────────────────────────
 
@@ -682,6 +1063,28 @@ export function TransformTab() {
                 </p>
               )}
               <button
+                onClick={handleGetEmbedCode}
+                disabled={isSavingDraft}
+                className={cn(
+                  "flex items-center gap-1.5 text-sm font-medium border rounded-lg px-3.5 py-1.5 transition-colors",
+                  savedStoryId
+                    ? "text-primary border-primary/30 bg-primary/5 hover:bg-primary/10"
+                    : "text-foreground border-border hover:bg-muted"
+                )}
+              >
+                {isSavingDraft ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Code2 className="h-3.5 w-3.5" />
+                    Get embed code
+                  </>
+                )}
+              </button>
+              <button
                 onClick={() => { setIsEditing(true); setEditSlideIndex(0) }}
                 className="flex items-center gap-1.5 text-sm font-medium text-foreground border border-border rounded-lg px-3.5 py-1.5 hover:bg-muted transition-colors"
               >
@@ -691,8 +1094,146 @@ export function TransformTab() {
             </div>
           </div>
 
-          {/* Mobile preview */}
-          <MobileSlidePreviewRenderer story={previewStory} />
+          {/* Save error */}
+          {saveError && (
+            <div className="w-full max-w-3xl p-3 rounded-lg border border-red-500/30 bg-red-500/10 text-sm text-red-400 text-center">
+              {saveError}
+            </div>
+          )}
+
+          {/* Carousel preview */}
+          <div className="relative w-full flex items-center justify-center" style={{ height: 850 }}>
+            {/* Prev arrow */}
+            <button
+              onClick={() => setCarouselIndex((i) => Math.max(0, i - 1))}
+              disabled={carouselIndex === 0}
+              className="absolute left-4 top-1/2 -translate-y-1/2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm border border-white/10 text-white/70 hover:text-white hover:bg-black/60 transition-all disabled:opacity-0 disabled:pointer-events-none"
+              aria-label="Previous slide"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+
+            {/* Slide cards */}
+            {editVirtualSlides.map((slide, i) => {
+              const offset = i - carouselIndex
+              const absOffset = Math.abs(offset)
+              if (absOffset > 2) return null
+
+              const scale = absOffset === 0 ? 1 : absOffset === 1 ? 0.8 : 0.65
+              const translateX = offset * 340
+              const opacity = absOffset === 0 ? 1 : absOffset === 1 ? 0.7 : 0.4
+              const zIndex = 10 - absOffset
+
+              return (
+                <div
+                  key={slide.key}
+                  onClick={() => absOffset > 0 && setCarouselIndex(i)}
+                  style={{
+                    position: 'absolute',
+                    width: 375, height: 812,
+                    background: '#000000',
+                    borderRadius: 44,
+                    overflow: 'hidden',
+                    transform: `translateX(${translateX}px) scale(${scale})`,
+                    opacity,
+                    zIndex,
+                    transition: 'all 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
+                    cursor: absOffset > 0 ? 'pointer' : 'default',
+                    boxShadow: absOffset === 0
+                      ? '0 0 0 1px rgba(255,255,255,0.08), 0 24px 64px rgba(0,0,0,0.45), 0 8px 24px rgba(0,0,0,0.3)'
+                      : '0 0 0 1px rgba(255,255,255,0.05), 0 12px 32px rgba(0,0,0,0.3)',
+                    flexShrink: 0,
+                  }}
+                >
+                  {/* Segmented progress bar */}
+                  <div style={{ position: 'absolute', top: 54, left: 12, right: 12, display: 'flex', gap: 3, zIndex: 50, pointerEvents: 'none' }}>
+                    {editVirtualSlides.map((_, segI) => (
+                      <div
+                        key={segI}
+                        style={{
+                          flex: 1, height: 2.5, borderRadius: 2,
+                          background: segI <= i ? '#FFFFFF' : 'rgba(255,255,255,0.25)',
+                          transition: 'background 0.3s ease',
+                        }}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Slide content */}
+                  <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
+                    {slide.type === 'intro' && <CarouselIntroContent story={previewStory} />}
+                    {slide.type === 'content' && <CarouselSlideContent slide={slide.slide} />}
+                    {slide.type === 'quiz' && previewStory.quiz && <CarouselQuizContent quiz={previewStory.quiz} />}
+                    {slide.type === 'poll' && previewStory.poll && <CarouselPollContent poll={previewStory.poll} />}
+                  </div>
+                </div>
+              )
+            })}
+
+            {/* Next arrow */}
+            <button
+              onClick={() => setCarouselIndex((i) => Math.min(editVirtualSlides.length - 1, i + 1))}
+              disabled={carouselIndex === editVirtualSlides.length - 1}
+              className="absolute right-4 top-1/2 -translate-y-1/2 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/40 backdrop-blur-sm border border-white/10 text-white/70 hover:text-white hover:bg-black/60 transition-all disabled:opacity-0 disabled:pointer-events-none"
+              aria-label="Next slide"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+
+          {/* Slide indicator dots */}
+          <div className="flex items-center justify-center gap-1.5">
+            {editVirtualSlides.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCarouselIndex(i)}
+                className={cn(
+                  "rounded-full transition-all duration-300",
+                  i === carouselIndex
+                    ? "w-6 h-2 bg-primary"
+                    : "w-2 h-2 bg-muted-foreground/30 hover:bg-muted-foreground/50"
+                )}
+                aria-label={`Go to slide ${i + 1}`}
+              />
+            ))}
+          </div>
+
+          {/* Embed code modal */}
+          <Dialog open={showEmbedModal} onOpenChange={setShowEmbedModal}>
+            <DialogContent className="max-w-2xl flex flex-col max-h-[80vh]">
+              <DialogHeader>
+                <DialogTitle>Embed mobile preview</DialogTitle>
+                <DialogDescription>
+                  Copy this code to embed the interactive mobile story preview on any webpage.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="flex-1 overflow-auto mt-1">
+                <pre className="text-xs bg-muted rounded-md p-4 overflow-auto whitespace-pre-wrap break-all font-mono leading-relaxed border border-border">
+                  {generateMobileEmbedCode()}
+                </pre>
+              </div>
+              <div className="pt-4 border-t border-border mt-2">
+                <Button
+                  variant={copiedEmbed ? 'outline' : 'default'}
+                  size="sm"
+                  className="w-full"
+                  onClick={handleCopyEmbed}
+                >
+                  {copiedEmbed ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 mr-1.5" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5 mr-1.5" />
+                      Copy code
+                    </>
+                  )}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       )
     }
