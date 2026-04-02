@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { Link2, ArrowRight, RotateCcw, Pencil, Image as ImageIcon, Type, BarChart3, Check, ChevronLeft, ChevronRight, Camera, Copy, Loader2, Code2 } from 'lucide-react'
+import { Link2, ArrowRight, RotateCcw, Pencil, Image as ImageIcon, Type, BarChart3, Check, ChevronLeft, ChevronRight, Camera, Copy, Loader2, Code2, Rocket } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CmsStory, CmsSlide } from '@/components/preview/mobile-slide-preview'
 import { MediaPickerModal } from '@/components/media-picker-modal'
@@ -678,6 +678,8 @@ export function TransformTab() {
   const [showEmbedModal, setShowEmbedModal] = useState(false)
   const [copiedEmbed, setCopiedEmbed] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [isPublishing, setIsPublishing] = useState(false)
+  const [isPublished, setIsPublished] = useState(false)
 
   // Fetch logged-in user + author record
   useEffect(() => {
@@ -794,6 +796,8 @@ export function TransformTab() {
     setCarouselIndex(0)
     setSavedStoryId(null)
     setSaveError(null)
+    setIsPublished(false)
+    setIsPublishing(false)
   }, [])
 
   // ─── Save as draft & get embed code ────────────────────────────────────
@@ -843,6 +847,26 @@ export function TransformTab() {
     setCopiedEmbed(true)
     setTimeout(() => setCopiedEmbed(false), 2000)
   }, [generateMobileEmbedCode])
+
+  // ─── Publish to Newsreel ──────────────────────────────────────────────
+
+  const handlePublish = useCallback(async () => {
+    if (!savedStoryId || isPublished) return
+    setIsPublishing(true)
+    setSaveError(null)
+    try {
+      const { error } = await supabase
+        .from('stories')
+        .update({ published_at: new Date().toISOString() })
+        .eq('id', savedStoryId)
+      if (error) throw error
+      setIsPublished(true)
+    } catch (err) {
+      setSaveError((err as Error).message || 'Failed to publish')
+    } finally {
+      setIsPublishing(false)
+    }
+  }, [savedStoryId, isPublished])
 
   // ─── Edit mode helpers ──────────────────────────────────────────────────
 
@@ -1084,13 +1108,35 @@ export function TransformTab() {
                   </>
                 )}
               </button>
-              <button
-                onClick={() => { setIsEditing(true); setEditSlideIndex(0) }}
-                className="flex items-center gap-1.5 text-sm font-medium text-foreground border border-border rounded-lg px-3.5 py-1.5 hover:bg-muted transition-colors"
-              >
-                <Pencil className="h-3.5 w-3.5" />
-                Edit
-              </button>
+              {savedStoryId && (
+                <button
+                  onClick={handlePublish}
+                  disabled={isPublishing || isPublished}
+                  className={cn(
+                    "flex items-center gap-1.5 text-sm font-medium border rounded-lg px-3.5 py-1.5 transition-colors",
+                    isPublished
+                      ? "text-emerald-400 border-emerald-500/30 bg-emerald-500/10 cursor-default"
+                      : "text-foreground border-border hover:bg-muted"
+                  )}
+                >
+                  {isPublishing ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Publishing...
+                    </>
+                  ) : isPublished ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" />
+                      Published
+                    </>
+                  ) : (
+                    <>
+                      <Rocket className="h-3.5 w-3.5" />
+                      Publish to Newsreel
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
 
@@ -1166,6 +1212,38 @@ export function TransformTab() {
                     {slide.type === 'quiz' && previewStory.quiz && <CarouselQuizContent quiz={previewStory.quiz} />}
                     {slide.type === 'poll' && previewStory.poll && <CarouselPollContent poll={previewStory.poll} />}
                   </div>
+
+                  {/* Edit button overlay on center slide */}
+                  {absOffset === 0 && (
+                    <button
+                      onClick={() => { setIsEditing(true); setEditSlideIndex(i) }}
+                      style={{
+                        position: 'absolute',
+                        top: 68,
+                        right: 12,
+                        zIndex: 60,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        background: 'rgba(0, 0, 0, 0.5)',
+                        backdropFilter: 'blur(12px)',
+                        WebkitBackdropFilter: 'blur(12px)',
+                        border: '1px solid rgba(255, 255, 255, 0.15)',
+                        color: '#fff',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                      }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0, 0, 0, 0.7)' }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0, 0, 0, 0.5)' }}
+                    >
+                      <Pencil style={{ width: 12, height: 12 }} />
+                      Edit
+                    </button>
+                  )}
                 </div>
               )
             })}
