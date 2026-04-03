@@ -171,32 +171,31 @@ QUIZ:
 - The correct answer must NOT be a number or percentage
 - Mark which answer is correct using the correct_answer field (a, b, c, or d)
 
-IMAGE QUERIES:
-CRITICAL: Read the slide CONTENT carefully. Generate SPECIFIC, SEARCHABLE queries.
-- "gif_query": SPECIFIC TERMS (1-3 words) that return GREAT GIFs
-  - Think: what real thing/person/event would GIFs show?
+MEDIA QUERIES:
+CRITICAL: Queries must be RELEVANT to the story subject. Do NOT use generic stock photo terms.
+Think: what would a journalist search to illustrate THIS specific story?
+
+- "image_query": 1-2 words, directly tied to the story's subject matter
+  - Story about Wikipedia → "wikipedia", "encyclopedia", "wiki editing"
+  - Story about Tesla stock → "Tesla", "Elon Musk", "electric car"
+  - Story about hurricane → "hurricane damage", "storm surge"
+  - Story about a court case → "supreme court", "judge gavel"
+  - GOOD: uses names, brands, places, or specific things FROM the article
+  - BAD: generic terms like "birthday cake", "trophy", "smartphone" that have nothing to do with the story
+
+- "gif_query": 1-3 words, expressive reaction or action related to the slide's tone
   - Read: "Stock prices plummeted" → gif_query: "stock market crash"
   - Read: "FDA approves medicine" → gif_query: "celebration cheering"
-  - Read: "Court case lost" → gif_query: "disappointed sad"
-  - Read: "Tech released" → gif_query: "excited happy"
-  - Read: "AI breakthrough" → gif_query: "robot learning"
-  Examples: Trump, celebration, disappointed, running, dancing, laughing, excited, sad, angry, shocked, confused, party, winning, losing, surprised, amazed, explosion, fire, crash, jump, fist bump, high five
+  - Read: "Milestone anniversary" → gif_query: "happy anniversary"
+  - Read: "Unexpected growth" → gif_query: "mind blown"
   - Must be CONCRETE and SEARCHABLE (what would you type in Giphy search bar?)
 
-- "image_query": ONE specific object/place (1-2 words)
-  - Read: "Tesla stock" → "Tesla"
-  - Read: "Weather disaster" → "hurricane"
-  - Read: "Victory" → "trophy"
-  Examples: courtroom, office, smartphone, trophy, hurricane, stadium, robot, brain, building, crowd
-
-RULES:
-- gif_query: 1-3 words, SPECIFIC and SEARCHABLE (would "stock market crash" find great GIFs? YES)
-- image_query: 1-2 words, concrete object/place
-- NEVER abstract: "sadness" BAD, "disappointed sad" GOOD
-- NEVER vague: "emotion" BAD, "celebration" GOOD
-- ABSOLUTELY: Each slide's gif_query MUST BE UNIQUE - never use same query twice
-- ABSOLUTELY: Each slide's image_query MUST BE UNIQUE - never use same query twice
-- If you used "college party" for slide 1, you CANNOT use it again for slide 3. Generate different queries.
+QUERY RULES:
+- image_query must reference the ACTUAL topic — names, brands, places, events from the article
+- gif_query should match the slide's emotional tone or action
+- NEVER use generic filler terms unrelated to the story (e.g. "birthday cake" for a tech story)
+- Each slide's gif_query MUST BE UNIQUE — never repeat the same query across slides
+- Each slide's image_query MUST BE UNIQUE — never repeat the same query across slides
 
 OUTPUT FORMAT:
 Return valid JSON with this exact structure:

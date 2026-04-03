@@ -64,32 +64,28 @@ async function fetchSlideMedia(
   gifQuery: string,
   imageQuery: string,
   excludeUrls: Set<string>,
+  preferGif: boolean,
 ): Promise<MediaResult | null> {
-  // Priority 1: Try GIF query first (GIFs are most engaging)
+  // Fetch results using the appropriate query
+  const query = preferGif ? gifQuery : imageQuery
+  let results: MediaResult[] = []
   try {
-    const gifRes = await fetch(`/api/media-search?q=${encodeURIComponent(gifQuery)}&type=image`)
-    if (gifRes.ok) {
-      const data = await gifRes.json()
-      const results: MediaResult[] = data.results || []
-      // Prefer giphy source, then any result
-      const gif = results.find((r) => r.source === 'giphy' && !excludeUrls.has(r.url))
-        ?? results.find((r) => !excludeUrls.has(r.url))
-      if (gif) return gif
+    const res = await fetch(`/api/media-search?q=${encodeURIComponent(query)}&type=image`)
+    if (res.ok) {
+      const data = await res.json()
+      results = data.results || []
     }
   } catch { /* fall through */ }
 
-  // Priority 2: Try image query
-  try {
-    const imgRes = await fetch(`/api/media-search?q=${encodeURIComponent(imageQuery)}&type=image`)
-    if (imgRes.ok) {
-      const data = await imgRes.json()
-      const results: MediaResult[] = data.results || []
-      const img = results.find((r) => !excludeUrls.has(r.url))
-      if (img) return img
-    }
-  } catch { /* fall through */ }
+  // Split into GIFs (Giphy) and static images (everything else)
+  const gifs = results.filter((r) => r.source === 'giphy' && !excludeUrls.has(r.url))
+  const images = results.filter((r) => r.source !== 'giphy' && !excludeUrls.has(r.url))
 
-  return null
+  // Pick preferred type first, fallback to the other — never blank
+  if (preferGif) {
+    return gifs[0] ?? images[0] ?? null
+  }
+  return images[0] ?? gifs[0] ?? null
 }
 
 // ─── Convert transform response → CmsStory ─────────────────────────────────
@@ -756,18 +752,20 @@ export function TransformTab() {
 
       for (let i = 0; i < story.slides.length; i++) {
         const slide = story.slides[i]
-        const result = await fetchSlideMedia(slide.gif_query, slide.image_query, usedUrls)
+        const preferGif = i % 2 === 1 // even slides = image, odd slides = gif
+        const result = await fetchSlideMedia(slide.gif_query, slide.image_query, usedUrls, preferGif)
         if (result) {
           usedUrls.add(result.url)
           slideMedia.set(i, result)
         }
       }
 
-      // Fetch a separate cover image using the headline (distinct from slide media)
+      // Fetch a separate cover image using the headline (always static image for cover)
       const coverMedia = await fetchSlideMedia(
         story.story_headline,
         story.slides[0]?.image_query || 'news',
         usedUrls,
+        false, // cover always prefers static image
       )
 
       // Step 3: Convert to CmsStory and render
