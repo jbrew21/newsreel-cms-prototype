@@ -1009,18 +1009,6 @@ export function TransformTab() {
     setTimeout(() => setRecorderOpen(true), 150)
   }, [])
 
-  const handleTryExample = (exampleUrl: string) => {
-    setUrl(exampleUrl)
-    setPreviewStory(null)
-    setTransformedUrl(null)
-    setError(null)
-  }
-
-  const examples = [
-    { label: 'Try: Oberlin Review', url: 'https://oberlinreview.org' },
-    { label: 'Try: BBC News', url: 'https://bbc.com/news' },
-    { label: 'Try: Wikipedia', url: 'https://wikipedia.org' },
-  ]
 
   const steps = [
     { num: '01', title: 'Paste any URL', desc: 'Any article from any site. News, opinion, features, research — it all works.' },
@@ -1703,19 +1691,6 @@ export function TransformTab() {
         </button>
       </div>
 
-      {/* Example links */}
-      <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-        {examples.map((ex) => (
-          <button
-            key={ex.label}
-            onClick={() => handleTryExample(ex.url)}
-            className="px-3 py-1.5 rounded-full border border-border text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 transition-all duration-200"
-            style={{ fontFamily: 'var(--font-ibm-plex-mono), monospace' }}
-          >
-            {ex.label}
-          </button>
-        ))}
-      </div>
 
       {/* Error */}
       {error && (
