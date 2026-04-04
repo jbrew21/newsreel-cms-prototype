@@ -255,60 +255,75 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Missing url' }, { status: 400 })
   }
 
-  // 2. SSRF check
-  if (!isSafeUrl(url)) {
+  // 2. Auto-detect: is this a URL or raw pasted text?
+  const input = url.trim()
+  const isUrl = /^https?:\/\//i.test(input)
+
+  // 3. SSRF check (only for URLs)
+  if (isUrl && !isSafeUrl(input)) {
     return NextResponse.json({ error: 'URL not allowed' }, { status: 400 })
   }
 
-  // 3. Rate limit
+  // 4. Rate limit
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
   if (!checkRateLimit(ip)) {
     return NextResponse.json({ error: 'Rate limit exceeded. Try again later.' }, { status: 429 })
   }
 
-  // 4. Scrape content (3-tier: direct fetch → Firecrawl → fail)
   let title = ''
   let siteName = ''
   let text = ''
 
-  // Tier 1: Direct fetch with browser headers
-  try {
-    const res = await fetch(url, { headers: BROWSER_HEADERS, redirect: 'follow' })
-    if (res.ok) {
-      const html = await res.text()
-      const tier1 = extractFromHtml(html)
-      title = tier1.title
-      siteName = tier1.siteName
-      text = tier1.text
+  if (isUrl) {
+    // ─── Link mode: scrape content (2-tier: direct fetch → Firecrawl) ──
+    // Tier 1: Direct fetch with browser headers
+    try {
+      const res = await fetch(input, { headers: BROWSER_HEADERS, redirect: 'follow' })
+      if (res.ok) {
+        const html = await res.text()
+        const tier1 = extractFromHtml(html)
+        title = tier1.title
+        siteName = tier1.siteName
+        text = tier1.text
+      }
+    } catch {
+      // Direct fetch failed (network error, timeout, etc.) — fall through to Firecrawl
     }
-  } catch {
-    // Direct fetch failed (network error, timeout, etc.) — fall through to Firecrawl
-  }
 
-  // Tier 2: Firecrawl if direct fetch failed or returned insufficient text
-  if (text.length < 400) {
-    const tier2 = await firecrawlScrape(url)
-    if (tier2 && tier2.text.length > text.length) {
-      text = tier2.text
-      if (tier2.title) title = tier2.title
-      if (tier2.siteName) siteName = tier2.siteName
+    // Tier 2: Firecrawl if direct fetch failed or returned insufficient text
+    if (text.length < 400) {
+      const tier2 = await firecrawlScrape(input)
+      if (tier2 && tier2.text.length > text.length) {
+        text = tier2.text
+        if (tier2.title) title = tier2.title
+        if (tier2.siteName) siteName = tier2.siteName
+      }
     }
+
+    // Fallback site name from hostname
+    if (!siteName) {
+      try {
+        siteName = new URL(input).hostname.replace(/^www\./, '')
+      } catch {
+        siteName = 'Unknown'
+      }
+    }
+  } else {
+    // ─── Text mode: raw pasted text, skip all scraping ─────────────────
+    text = input
+    siteName = 'User Provided'
   }
 
   // Cap text & validate minimum
   text = text.slice(0, MAX_TEXT_LENGTH)
   if (text.length < MIN_TEXT_LENGTH) {
-    return NextResponse.json({ error: 'Could not extract enough text from this URL. The site may be blocking automated access.' }, { status: 422 })
+    return NextResponse.json({
+      error: isUrl
+        ? 'Could not extract enough text from this URL. The site may be blocking automated access.'
+        : 'Please provide more text (at least a few sentences).',
+    }, { status: 422 })
   }
 
-  // Fallback site name from hostname
-  if (!siteName) {
-    try {
-      siteName = new URL(url).hostname.replace(/^www\./, '')
-    } catch {
-      siteName = 'Unknown'
-    }
-  }
   if (!title) title = 'Untitled Article'
 
   // 6. Call Claude
