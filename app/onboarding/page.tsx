@@ -12,6 +12,7 @@ import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { Camera, ImageIcon, Loader2, User, Eye, Target, BookOpen, Check, ArrowRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getPublicUrl } from '@/lib/supabase/storage'
 
 const AVATAR_BUCKET = 'author-avatars'
 const COVER_BUCKET = 'author-covers'
@@ -351,11 +352,7 @@ function OnboardingContent() {
           throw new Error(`Failed to upload avatar: ${uploadError.message}`)
         }
 
-        const { data: urlData } = supabase.storage
-          .from(AVATAR_BUCKET)
-          .getPublicUrl(avatarPath)
-
-        avatarUrl = urlData.publicUrl
+        avatarUrl = getPublicUrl(AVATAR_BUCKET, avatarPath)
       }
 
       let coverUrl = coverPreview
@@ -374,11 +371,7 @@ function OnboardingContent() {
           throw new Error(`Failed to upload cover: ${uploadError.message}`)
         }
 
-        const { data: urlData } = supabase.storage
-          .from(COVER_BUCKET)
-          .getPublicUrl(coverPath)
-
-        coverUrl = urlData.publicUrl
+        coverUrl = getPublicUrl(COVER_BUCKET, coverPath)
       }
 
       const profilePayload = {

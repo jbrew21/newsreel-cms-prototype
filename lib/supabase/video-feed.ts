@@ -2,6 +2,7 @@ import { supabase } from './client'
 import {
   STORAGE_BUCKET,
   getFileExtension,
+  getPublicUrl,
   buildObjectPathForVideoFeedVideo,
   buildObjectPathForVideoFeedPoster,
   uploadAndCreateMediaAsset,
@@ -197,20 +198,14 @@ export async function getVideoFeedWithMedia(videoFeedId: string): Promise<{
   const videoMedia = videoFeed.video_feed_media?.find((vfm: any) => vfm.role === 'video')
   if (videoMedia?.media_assets) {
     const asset = videoMedia.media_assets
-    const { data } = supabase.storage
-      .from(asset.bucket)
-      .getPublicUrl(asset.object_path)
-    videoUrl = data.publicUrl
+    videoUrl = getPublicUrl(asset.bucket, asset.object_path)
   }
 
   // Find poster media
   const posterMedia = videoFeed.video_feed_media?.find((vfm: any) => vfm.role === 'poster')
   if (posterMedia?.media_assets) {
     const asset = posterMedia.media_assets
-    const { data } = supabase.storage
-      .from(asset.bucket)
-      .getPublicUrl(asset.object_path)
-    posterUrl = data.publicUrl
+    posterUrl = getPublicUrl(asset.bucket, asset.object_path)
   }
 
   return { videoFeed, videoUrl, posterUrl }

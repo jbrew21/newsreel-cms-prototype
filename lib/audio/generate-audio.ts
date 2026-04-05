@@ -10,6 +10,7 @@
  */
 
 import { supabase } from '../supabase/client'
+import { getPublicUrl } from '../supabase/storage'
 import OpenAI from 'openai'
 import { writeFile, unlink, readFile } from 'fs/promises'
 import { join } from 'path'
@@ -240,8 +241,7 @@ async function uploadAudioToStorage(objectPath: string, filePath: string): Promi
     throw new Error(`Failed to upload audio: ${error.message}`)
   }
 
-  const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(objectPath)
-  return data.publicUrl
+  return getPublicUrl(STORAGE_BUCKET, objectPath)
 }
 
 // ============================================

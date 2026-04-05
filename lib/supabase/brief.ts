@@ -386,10 +386,7 @@ export async function getStoryWithCover(storyId: string): Promise<{
 
   if (coverMedia?.media_assets) {
     const asset = coverMedia.media_assets
-    const { data } = supabase.storage
-      .from(asset.bucket)
-      .getPublicUrl(asset.object_path)
-    coverUrl = data.publicUrl
+    coverUrl = getPublicUrl(asset.bucket, asset.object_path)
   }
 
   return { story, coverUrl }

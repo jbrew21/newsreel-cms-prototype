@@ -9,6 +9,7 @@
  */
 
 import { supabase } from '../supabase/client'
+import { getPublicUrl } from '../supabase/storage'
 import OpenAI from 'openai'
 import { writeFile, unlink } from 'fs/promises'
 import { createReadStream, statSync } from 'fs'
@@ -73,11 +74,7 @@ export async function extractCaptionsForStory(storyId: string): Promise<void> {
     if (!videoAsset) continue
 
     // Resolve public URL
-    const { data: urlData } = supabase.storage
-      .from(videoAsset.bucket)
-      .getPublicUrl(videoAsset.object_path)
-
-    const videoUrl = urlData?.publicUrl
+    const videoUrl = getPublicUrl(videoAsset.bucket, videoAsset.object_path)
     if (!videoUrl) continue
 
     // Check if captions already exist for this slide

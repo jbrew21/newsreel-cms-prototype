@@ -114,10 +114,17 @@ export async function uploadFile(
 }
 
 /**
- * Get public URL for a file in storage
+ * Get public URL for a file in storage.
+ * When NEXT_PUBLIC_CDN_URL is set, rewrites the Supabase origin URL
+ * to route through the CDN (e.g. Cloudflare) for edge caching.
  */
 export function getPublicUrl(bucket: string, path: string): string {
   const { data } = supabase.storage.from(bucket).getPublicUrl(path)
+  const cdnBase = process.env.NEXT_PUBLIC_CDN_URL
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (cdnBase && supabaseUrl) {
+    return data.publicUrl.replace(supabaseUrl, cdnBase)
+  }
   return data.publicUrl
 }
 

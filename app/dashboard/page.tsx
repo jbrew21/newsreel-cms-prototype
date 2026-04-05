@@ -9,6 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Plus, FileText, Video, Calendar, X, ExternalLink, Search, Users, Trash2, BarChart3, Wand2, Globe, EyeOff, RefreshCw, ChevronDown } from 'lucide-react'
 import { deleteStory } from '@/lib/supabase/brief'
+import { getPublicUrl } from '@/lib/supabase/storage'
 import { cn } from '@/lib/utils'
 import { Sidebar, MobileHeader, TabContent, TransformTab, type TabId } from '@/components/dashboard'
 import { AnalyticsDashboard } from '@/components/analytics'
@@ -225,10 +226,7 @@ export default function DashboardPage() {
             let coverMediaType: 'image' | 'video' | undefined
             const coverMedia = story.story_media?.find((sm: any) => sm.role === 'cover')
             if (coverMedia?.media_assets) {
-              const { data } = supabase.storage
-                .from(coverMedia.media_assets.bucket)
-                .getPublicUrl(coverMedia.media_assets.object_path)
-              coverUrl = data.publicUrl
+              coverUrl = getPublicUrl(coverMedia.media_assets.bucket, coverMedia.media_assets.object_path)
               coverMediaType = coverMedia.media_assets.media_type || undefined
             }
             return {
@@ -272,18 +270,12 @@ export default function DashboardPage() {
 
           const videoMedia = video.video_feed_media?.find((vfm: any) => vfm.role === 'video')
           if (videoMedia?.media_assets) {
-            const { data } = supabase.storage
-              .from(videoMedia.media_assets.bucket)
-              .getPublicUrl(videoMedia.media_assets.object_path)
-            videoUrl = data.publicUrl
+            videoUrl = getPublicUrl(videoMedia.media_assets.bucket, videoMedia.media_assets.object_path)
           }
 
           const posterMedia = video.video_feed_media?.find((vfm: any) => vfm.role === 'poster')
           if (posterMedia?.media_assets) {
-            const { data } = supabase.storage
-              .from(posterMedia.media_assets.bucket)
-              .getPublicUrl(posterMedia.media_assets.object_path)
-            posterUrl = data.publicUrl
+            posterUrl = getPublicUrl(posterMedia.media_assets.bucket, posterMedia.media_assets.object_path)
           }
 
           return {
@@ -348,10 +340,7 @@ export default function DashboardPage() {
           let coverMediaType: 'image' | 'video' | undefined
           const coverMedia = story.story_media?.find((sm: any) => sm.role === 'cover')
           if (coverMedia?.media_assets) {
-            const { data } = supabase.storage
-              .from(coverMedia.media_assets.bucket)
-              .getPublicUrl(coverMedia.media_assets.object_path)
-            coverUrl = data.publicUrl
+            coverUrl = getPublicUrl(coverMedia.media_assets.bucket, coverMedia.media_assets.object_path)
             coverMediaType = coverMedia.media_assets.media_type || undefined
           }
 

@@ -1,4 +1,4 @@
-import { supabase } from './client'
+import { getPublicUrl } from './storage'
 
 /**
  * CORS headers for public API endpoints
@@ -17,10 +17,7 @@ export function resolveMediaUrl(asset: {
   object_path: string
 } | null): string | null {
   if (!asset) return null
-  const { data } = supabase.storage
-    .from(asset.bucket)
-    .getPublicUrl(asset.object_path)
-  return data.publicUrl
+  return getPublicUrl(asset.bucket, asset.object_path)
 }
 
 /**
