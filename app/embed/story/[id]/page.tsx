@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { MobileSlidePreview } from '@/components/preview/mobile-slide-preview'
+import { EmbedAnalyticsClient } from '@/components/analytics/embed-analytics-client'
 
 interface Props {
   params: Promise<{ id: string }>
@@ -32,7 +32,7 @@ export default async function StoryEmbedPage({ params }: Props) {
         padding: '24px 16px',
       }}
     >
-      <MobileSlidePreview storyId={id} />
+      <EmbedAnalyticsClient storyId={id} />
     </div>
   )
 }

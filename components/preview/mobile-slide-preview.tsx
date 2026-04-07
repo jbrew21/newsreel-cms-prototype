@@ -717,9 +717,13 @@ export { type CmsStory, type CmsSlide }
 
 interface MobileSlidePreviewRendererProps {
   story: CmsStory
+  /** Optional analytics: fired once when the renderer knows the total slide count. */
+  onTotalSlidesReady?: (total: number) => void
+  /** Optional analytics: fired whenever the current slide index changes. */
+  onSlideChange?: (index: number) => void
 }
 
-export function MobileSlidePreviewRenderer({ story }: MobileSlidePreviewRendererProps) {
+export function MobileSlidePreviewRenderer({ story, onTotalSlidesReady, onSlideChange }: MobileSlidePreviewRendererProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
 
   const virtualSlides: VirtualSlide[] = [
@@ -740,6 +744,15 @@ export function MobileSlidePreviewRenderer({ story }: MobileSlidePreviewRenderer
       setCurrentIndex(total - 1)
     }
   }, [total, currentIndex])
+
+  // ── Optional analytics callbacks (no-op when not provided) ──────────────
+  useEffect(() => {
+    if (onTotalSlidesReady && total > 0) onTotalSlidesReady(total)
+  }, [total, onTotalSlidesReady])
+
+  useEffect(() => {
+    if (onSlideChange) onSlideChange(currentIndex)
+  }, [currentIndex, onSlideChange])
 
   if (!total) {
     return (
@@ -814,9 +827,15 @@ export function MobileSlidePreviewRenderer({ story }: MobileSlidePreviewRenderer
 
 interface MobileSlidePreviewProps {
   storyId: string
+  /** Optional analytics: fired once when the story (and its first author) is loaded. */
+  onAuthorLoaded?: (authorId: string | null) => void
+  /** Optional analytics: forwarded from renderer. See MobileSlidePreviewRendererProps. */
+  onTotalSlidesReady?: (total: number) => void
+  /** Optional analytics: forwarded from renderer. See MobileSlidePreviewRendererProps. */
+  onSlideChange?: (index: number) => void
 }
 
-export function MobileSlidePreview({ storyId }: MobileSlidePreviewProps) {
+export function MobileSlidePreview({ storyId, onAuthorLoaded, onTotalSlidesReady, onSlideChange }: MobileSlidePreviewProps) {
   const [story, setStory] = useState<CmsStory | null>(null)
   const [loadingStory, setLoadingStory] = useState(true)
   const [fetchError, setFetchError] = useState<string | null>(null)
@@ -834,6 +853,13 @@ export function MobileSlidePreview({ storyId }: MobileSlidePreviewProps) {
       .finally(() => setLoadingStory(false))
   }, [storyId])
 
+  // ── Optional analytics: emit authorId once story is loaded ────────────
+  useEffect(() => {
+    if (story && onAuthorLoaded) {
+      onAuthorLoaded(story.authors?.[0]?.id ?? null)
+    }
+  }, [story, onAuthorLoaded])
+
   if (loadingStory) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -850,5 +876,11 @@ export function MobileSlidePreview({ storyId }: MobileSlidePreviewProps) {
     )
   }
 
-  return <MobileSlidePreviewRenderer story={story} />
+  return (
+    <MobileSlidePreviewRenderer
+      story={story}
+      onTotalSlidesReady={onTotalSlidesReady}
+      onSlideChange={onSlideChange}
+    />
+  )
 }
