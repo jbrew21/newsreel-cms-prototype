@@ -595,13 +595,18 @@ export async function getDeviceBreakdown(
   const rows = await fetchEvents(
     client,
     { storyIds, range, eventTypes: ['open'] },
-    'story_id,device_type,event_type'
+    'story_id,device_type,source,event_type'
   )
 
+  // Read-time override: native app traffic is always mobile regardless of
+  // how the stored `device_type` column was classified. This fixes historical
+  // rows written before the classifier understood the app's custom User-Agent
+  // without requiring a backfill.
   const counts = new Map<string, number>()
   for (const r of rows) {
-    const key = r.device_type || 'unknown'
-    counts.set(key, (counts.get(key) ?? 0) + 1)
+    const effective =
+      r.source === 'app' ? 'mobile' : r.device_type || 'unknown'
+    counts.set(effective, (counts.get(effective) ?? 0) + 1)
   }
 
   const total = Array.from(counts.values()).reduce((a, b) => a + b, 0) || 1
