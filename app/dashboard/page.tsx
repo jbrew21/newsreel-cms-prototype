@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useMemo } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -71,8 +71,16 @@ function formatDate(dateString: string | null): string {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
+const VALID_TABS: readonly TabId[] = ['drafts', 'published', 'all', 'analytics', 'transform'] as const
+
+function parseTabParam(value: string | null): TabId | null {
+  if (!value) return null
+  return (VALID_TABS as readonly string[]).includes(value) ? (value as TabId) : null
+}
+
 export default function DashboardPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
   const [author, setAuthor] = useState<Author | null>(null)
   const [loading, setLoading] = useState(true)
@@ -80,7 +88,8 @@ export default function DashboardPage() {
   const [videoFeeds, setVideoFeeds] = useState<VideoFeedWithMedia[]>([])
   const [selectedContent, setSelectedContent] = useState<ContentItem | null>(null)
   const [isInternalTeam, setIsInternalTeam] = useState(false)
-  const [activeTab, setActiveTab] = useState<TabId>('drafts')
+  // Respect ?tab= query param so per-story analytics can land back on Analytics
+  const [activeTab, setActiveTab] = useState<TabId>(() => parseTabParam(searchParams?.get('tab') ?? null) ?? 'drafts')
   const [allStories, setAllStories] = useState<StoryWithMedia[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [allStoriesLoading, setAllStoriesLoading] = useState(false)
@@ -472,6 +481,15 @@ export default function DashboardPage() {
     setActiveTab(tab)
     setSelectedIds(new Set())
     setBulkDeleteConfirm(false)
+    // Reflect the active tab in the URL so deep-links and browser history work.
+    const params = new URLSearchParams(searchParams?.toString() ?? '')
+    if (tab === 'drafts') {
+      params.delete('tab')
+    } else {
+      params.set('tab', tab)
+    }
+    const qs = params.toString()
+    router.replace(qs ? `/dashboard?${qs}` : '/dashboard', { scroll: false })
     // Only fetch All stories if we haven't loaded them yet (cache)
     if (tab === 'all' && allStories.length === 0) fetchAllStories()
   }
