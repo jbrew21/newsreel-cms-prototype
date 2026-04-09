@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useRef, useEffect } from 'react'
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { Link2, ArrowRight, RotateCcw, Pencil, Image as ImageIcon, Type, BarChart3, Check, ChevronLeft, ChevronRight, Camera, Copy, Loader2, Code2, Rocket } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CmsStory, CmsSlide } from '@/components/preview/mobile-slide-preview'
@@ -12,7 +12,17 @@ import type { BackgroundConfig } from '@/hooks/use-video-compositor'
 import type { MediaItem } from '@/lib/media-search/types'
 import { supabase } from '@/lib/supabase/client'
 import { saveBriefPost } from '@/lib/supabase/brief'
-import type { BriefFormData } from '@/lib/supabase/types'
+import type { AuthorBrand, BriefFormData } from '@/lib/supabase/types'
+import {
+  getAuthorBrandByDomain,
+  getHouseBrand,
+  hexToRgba,
+  resolveBrandDomain,
+  resolveDisplayBrand,
+  type ResolvedBrand,
+} from '@/lib/supabase/author-brand'
+import { BrandMark } from '@/components/brand/brand-mark'
+import { BrandSettingsModal } from '@/components/brand/brand-settings-modal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import dynamic from 'next/dynamic'
@@ -232,10 +242,12 @@ function buildVirtualSlides(story: CmsStory): EditableVirtualSlide[] {
 
 function EditableIntroSlide({
   story,
+  brand,
   onUpdateHeadline,
   onUpdateSubhead,
 }: {
   story: CmsStory
+  brand: ResolvedBrand
   onUpdateHeadline: (val: string) => void
   onUpdateSubhead: (val: string) => void
 }) {
@@ -308,7 +320,7 @@ function EditableIntroSlide({
         <div style={{ marginTop: 20, textAlign: 'center' }}>
           <span style={{ fontSize: 12, color: '#F0F0F0', fontFamily: '"DM Sans",sans-serif' }}>
             Read full story on{' '}
-            <span style={{ color: '#FF6343', fontWeight: 700, textDecoration: 'underline' }}>
+            <span style={{ color: brand.primary_color, fontWeight: 700, textDecoration: 'underline' }}>
               {story.partner_name}
             </span>
           </span>
@@ -322,10 +334,12 @@ function EditableIntroSlide({
 
 function EditableContentSlide({
   slide,
+  brand,
   onUpdateHeadline,
   onUpdateBody,
 }: {
   slide: CmsSlide
+  brand: ResolvedBrand
   onUpdateHeadline: (val: string) => void
   onUpdateBody: (val: string) => void
 }) {
@@ -363,7 +377,7 @@ function EditableContentSlide({
 
       {/* Editable chat bubble */}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'flex-start', paddingBottom: 80, paddingLeft: 16, paddingRight: 16, zIndex: 10 }}>
-        <div style={{ background: 'rgba(30,58,95,0.4)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)', borderRadius: 16, padding: 16, maxWidth: '87%', boxShadow: '0 4px 8px rgba(0,0,0,0.4)', marginBottom: 16 }}>
+        <div style={{ background: hexToRgba(brand.secondary_color, 0.4), backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)', borderRadius: 16, padding: 16, maxWidth: '87%', boxShadow: '0 4px 8px rgba(0,0,0,0.4)', marginBottom: 16 }}>
           {headline !== null && headline !== undefined && (
             <div
               contentEditable
@@ -406,7 +420,7 @@ function EditableContentSlide({
 
 // ─── Carousel slide renderers (read-only) ───────────────────────────────────
 
-function CarouselIntroContent({ story }: { story: CmsStory }) {
+function CarouselIntroContent({ story, brand }: { story: CmsStory; brand: ResolvedBrand }) {
   return (
     <div
       style={{
@@ -441,7 +455,7 @@ function CarouselIntroContent({ story }: { story: CmsStory }) {
         <div style={{ marginTop: 20, textAlign: 'center' }}>
           <span style={{ fontSize: 12, color: '#F0F0F0', fontFamily: '"DM Sans",sans-serif' }}>
             Read full story on{' '}
-            <span style={{ color: '#FF6343', fontWeight: 700, textDecoration: 'underline' }}>
+            <span style={{ color: brand.primary_color, fontWeight: 700, textDecoration: 'underline' }}>
               {story.partner_name}
             </span>
           </span>
@@ -451,7 +465,7 @@ function CarouselIntroContent({ story }: { story: CmsStory }) {
   )
 }
 
-function CarouselSlideContent({ slide }: { slide: CmsSlide }) {
+function CarouselSlideContent({ slide, brand }: { slide: CmsSlide; brand: ResolvedBrand }) {
   const heroMedia = slide.media.find((m) => m.role === 'hero') ?? slide.media[0] ?? null
   const isVideo = heroMedia?.media_type === 'video'
   const hasContent1 = !!slide.slide_content_1
@@ -482,7 +496,7 @@ function CarouselSlideContent({ slide }: { slide: CmsSlide }) {
         </div>
       )}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'flex-start', paddingBottom: 80, paddingLeft: 16, paddingRight: 16, zIndex: 10 }}>
-        <div style={{ background: 'rgba(30,58,95,0.4)', backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)', borderRadius: 16, padding: 16, maxWidth: '87%', boxShadow: '0 4px 8px rgba(0,0,0,0.4)', marginBottom: 16 }}>
+        <div style={{ background: hexToRgba(brand.secondary_color, 0.4), backdropFilter: 'blur(30px)', WebkitBackdropFilter: 'blur(30px)', borderRadius: 16, padding: 16, maxWidth: '87%', boxShadow: '0 4px 8px rgba(0,0,0,0.4)', marginBottom: 16 }}>
           {headline && (
             <p style={{ fontSize: 20.8, lineHeight: '27.2px', fontWeight: 700, color: '#FFF', fontFamily: '"DM Sans",sans-serif', margin: 0, marginBottom: body ? 16 : 0 }}>
               {headline}
@@ -667,8 +681,29 @@ export function TransformTab() {
 
   // ─── Embed / save-as-draft state ───────────────────────────────────────
   const [userId, setUserId] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
   const [authorId, setAuthorId] = useState<string | null>(null)
   const [authorName, setAuthorName] = useState('')
+
+  // ─── Publisher brand state ─────────────────────────────────────────────
+  // `authorBrand` = the logged-in author's own domain brand (may be null).
+  // `houseBrand`  = the Newsreel house brand row, used as the fallback for
+  //                 any author who hasn't set up their own. Fetched from
+  //                 the DB — never a bundled local logo.
+  const [authorBrand, setAuthorBrand] = useState<AuthorBrand | null>(null)
+  const [houseBrand, setHouseBrand] = useState<AuthorBrand | null>(null)
+  const [brandModalOpen, setBrandModalOpen] = useState(false)
+
+  const resolvedBrand: ResolvedBrand = useMemo(
+    () => resolveDisplayBrand(authorBrand, houseBrand),
+    [authorBrand, houseBrand]
+  )
+  // Generic-email authors (gmail, yahoo, etc.) cannot own a publisher brand
+  // and never see the edit affordance — they just see the house fallback.
+  const canOwnBrand = useMemo(
+    () => resolveBrandDomain(userEmail) !== null,
+    [userEmail]
+  )
   const [isSavingDraft, setIsSavingDraft] = useState(false)
   const [savedStoryId, setSavedStoryId] = useState<string | null>(null)
   const [showEmbedModal, setShowEmbedModal] = useState(false)
@@ -677,11 +712,27 @@ export function TransformTab() {
   const [isPublishing, setIsPublishing] = useState(false)
   const [isPublished, setIsPublished] = useState(false)
 
-  // Fetch logged-in user + author record
+  // Fetch logged-in user + author record + publisher brand + house brand.
+  // All setState calls are guarded by a `cancelled` flag so we never write
+  // to an unmounted component (e.g. user navigates away mid-fetch).
   useEffect(() => {
+    let cancelled = false
+
+    // Always fetch the Newsreel house brand — it's the fallback for any
+    // author who hasn't set up their own. Non-fatal if it fails: colors
+    // will degrade to safety defaults and the logo simply won't render.
+    getHouseBrand()
+      .then((brand) => {
+        if (!cancelled) setHouseBrand(brand)
+      })
+      .catch((err) => {
+        if (!cancelled) console.error('Failed to load Newsreel house brand:', err)
+      })
+
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return
+      if (cancelled || !user) return
       setUserId(user.id)
+      setUserEmail(user.email ?? null)
       if (user.email) {
         supabase
           .from('authors')
@@ -689,15 +740,32 @@ export function TransformTab() {
           .eq('author_email', user.email)
           .maybeSingle()
           .then(({ data }) => {
-            if (data) {
-              setAuthorId(data.id)
-              setAuthorName(
-                [data.author_first_name, data.author_last_name].filter(Boolean).join(' ') || ''
-              )
-            }
+            if (cancelled || !data) return
+            setAuthorId(data.id)
+            setAuthorName(
+              [data.author_first_name, data.author_last_name].filter(Boolean).join(' ') || ''
+            )
           })
+
+        // Fetch the author's publisher brand (by email domain). Non-fatal:
+        // on error or missing row, resolveDisplayBrand() falls through to
+        // the Newsreel house brand loaded above.
+        const brandDomain = resolveBrandDomain(user.email)
+        if (brandDomain) {
+          getAuthorBrandByDomain(brandDomain)
+            .then((brand) => {
+              if (!cancelled) setAuthorBrand(brand)
+            })
+            .catch((err) => {
+              if (!cancelled) console.error('Failed to load publisher brand:', err)
+            })
+        }
       }
     })
+
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
@@ -1023,7 +1091,7 @@ export function TransformTab() {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] gap-6 px-4">
         <img
-          src="/newsreel-logo.svg"
+          src="/logo/newsreel-light.png"
           alt="Newsreel"
           className="h-10 opacity-80"
           onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
@@ -1193,11 +1261,14 @@ export function TransformTab() {
 
                   {/* Slide content */}
                   <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-                    {slide.type === 'intro' && <CarouselIntroContent story={previewStory} />}
-                    {slide.type === 'content' && <CarouselSlideContent slide={slide.slide} />}
+                    {slide.type === 'intro' && <CarouselIntroContent story={previewStory} brand={resolvedBrand} />}
+                    {slide.type === 'content' && <CarouselSlideContent slide={slide.slide} brand={resolvedBrand} />}
                     {slide.type === 'quiz' && previewStory.quiz && <CarouselQuizContent quiz={previewStory.quiz} />}
                     {slide.type === 'poll' && previewStory.poll && <CarouselPollContent poll={previewStory.poll} />}
                   </div>
+
+                  {/* Publisher brand mark — display-only in carousel preview */}
+                  <BrandMark logoUrl={resolvedBrand.logo_url} />
 
                   {/* Edit button overlay on center slide */}
                   {absOffset === 0 && (
@@ -1375,11 +1446,19 @@ export function TransformTab() {
             <div style={{ height: '100%', width: `${progress * 100}%`, background: '#FFFFFF', transition: 'width 0.25s ease' }} />
           </div>
 
+          {/* Publisher brand mark — editable when using the Newsreel fallback */}
+          <BrandMark
+            logoUrl={resolvedBrand.logo_url}
+            showEditAffordance={canOwnBrand && resolvedBrand.isFallback}
+            onEditClick={() => setBrandModalOpen(true)}
+          />
+
           {/* Slide content */}
           <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
             {currentEditSlide?.type === 'intro' && (
               <EditableIntroSlide
                 story={previewStory}
+                brand={resolvedBrand}
                 onUpdateHeadline={handleUpdateHeadline}
                 onUpdateSubhead={handleUpdateSubhead}
               />
@@ -1387,6 +1466,7 @@ export function TransformTab() {
             {currentEditSlide?.type === 'content' && (
               <EditableContentSlide
                 slide={currentEditSlide.slide}
+                brand={resolvedBrand}
                 onUpdateHeadline={(val) => handleUpdateSlideHeadline(currentEditSlide.slideIndex, val)}
                 onUpdateBody={(val) => handleUpdateSlideBody(currentEditSlide.slideIndex, val)}
               />
@@ -1623,6 +1703,17 @@ export function TransformTab() {
           background={recorderBackground}
           onRecordingComplete={handleRecordingComplete}
         />
+
+        {/* Publisher brand settings — opened from the editable BrandMark */}
+        {canOwnBrand && (
+          <BrandSettingsModal
+            open={brandModalOpen}
+            onOpenChange={setBrandModalOpen}
+            authorEmail={userEmail}
+            authorId={authorId}
+            onSaved={(brand) => setAuthorBrand(brand)}
+          />
+        )}
 
         {/* Hidden file input for upload */}
         <input

@@ -287,7 +287,7 @@ export function StoryAnalyticsView({ storyId }: StoryAnalyticsViewProps) {
           <div className="glass-card p-4 animate-chart-in">
             <div className="flex items-center justify-between gap-3 flex-wrap">
               <div>
-                <p className="text-xs font-medium text-foreground">Share this story's stats</p>
+                <p className="text-xs font-medium text-foreground">Share this story&apos;s stats</p>
                 <p className="text-[11px] text-muted-foreground mt-0.5">
                   Use the shareable URL above to send this report to your team.
                 </p>

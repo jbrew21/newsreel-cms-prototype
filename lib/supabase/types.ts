@@ -24,6 +24,22 @@ export interface Author {
   published_at: string | null
 }
 
+/**
+ * Publisher brand shared by all authors under one email domain.
+ * One row per domain (e.g. "newsreel.co"). See lib/supabase/author-brand.ts.
+ */
+export interface AuthorBrand {
+  id: string
+  domain: string
+  logo_url: string | null
+  primary_color: string | null
+  secondary_color: string | null
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface Newsreel {
   id: string
   newsreel_date: string // date format: YYYY-MM-DD

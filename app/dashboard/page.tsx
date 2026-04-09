@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { Suspense, useEffect, useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -78,7 +78,11 @@ function parseTabParam(value: string | null): TabId | null {
   return (VALID_TABS as readonly string[]).includes(value) ? (value as TabId) : null
 }
 
-export default function DashboardPage() {
+// Inner content uses `useSearchParams`, which Next.js 14 requires to live
+// inside a `<Suspense>` boundary so the page can be statically prerendered.
+// The default export below is a thin wrapper that provides that boundary —
+// matches the pattern in `app/onboarding/page.tsx`.
+function DashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [user, setUser] = useState<any>(null)
@@ -1282,5 +1286,21 @@ function ContentCard({
         </div>
       </div>
     </Card>
+  )
+}
+
+// Suspense wrapper required by Next.js 14 because `DashboardContent` calls
+// `useSearchParams()`. Same shape as `app/onboarding/page.tsx`.
+export default function DashboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      }
+    >
+      <DashboardContent />
+    </Suspense>
   )
 }

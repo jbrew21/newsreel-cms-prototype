@@ -1,9 +1,39 @@
 /* eslint-disable @next/next/no-img-element */
 'use client'
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { BrandMark } from '@/components/brand/brand-mark'
+import { hexToRgba } from '@/lib/supabase/author-brand'
+
+// ─── Brand display values ────────────────────────────────────────────────────
+
+/**
+ * Color defaults used when `story.brand` is missing — e.g. dashboard create
+ * previews that construct a CmsStory in memory and feed it straight to
+ * MobileSlidePreviewRenderer without a round-trip through `/api/stories`.
+ * These mirror the pre-branding hardcoded values, so those code paths look
+ * identical to before. Iframes always get a real `brand` from the API.
+ */
+const BRAND_DEFAULTS = {
+  primary_color: '#FF6343',
+  secondary_color: '#1E3A5F',
+} as const
+
+interface BrandDisplay {
+  logo_url: string | null
+  primary_color: string
+  secondary_color: string
+}
+
+function getBrandDisplay(story: CmsStory): BrandDisplay {
+  return {
+    logo_url: story.brand?.logo_url ?? null,
+    primary_color: story.brand?.primary_color || BRAND_DEFAULTS.primary_color,
+    secondary_color: story.brand?.secondary_color || BRAND_DEFAULTS.secondary_color,
+  }
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,6 +95,17 @@ interface CmsStory {
   slides: CmsSlide[]
   quiz: CmsQuiz | null
   poll: CmsPoll | null
+  /**
+   * Publisher brand resolved server-side in `/api/stories/[id]`. Always
+   * present on stories fetched via that route (iframe embed). Optional so
+   * in-memory previews built on the dashboard can still render — they fall
+   * through to {@link BRAND_DEFAULTS}.
+   */
+  brand?: {
+    logo_url: string | null
+    primary_color: string
+    secondary_color: string
+  }
 }
 
 type VirtualSlide =
@@ -148,7 +189,7 @@ function AuthorBadge({ authors }: { authors: CmsAuthor[] }) {
 
 // ─── Author Byline — intro slide (45px avatars, newsreelRed) ─────────────────
 
-function AuthorByline({ authors }: { authors: CmsAuthor[] }) {
+function AuthorByline({ authors, brand }: { authors: CmsAuthor[]; brand: BrandDisplay }) {
   if (!authors.length) return null
   const name = authorDisplayName(authors)
   const avatarGroupWidth = 45 + (Math.min(authors.length, 3) - 1) * 13.5
@@ -184,7 +225,7 @@ function AuthorByline({ authors }: { authors: CmsAuthor[] }) {
           </div>
         ))}
       </div>
-      <span style={{ fontSize: 14, fontWeight: 700, color: '#FF6343', fontFamily: '"DM Sans",sans-serif', textDecoration: 'underline' }}>
+      <span style={{ fontSize: 14, fontWeight: 700, color: brand.primary_color, fontFamily: '"DM Sans",sans-serif', textDecoration: 'underline' }}>
         By {name}
       </span>
     </div>
@@ -193,7 +234,7 @@ function AuthorByline({ authors }: { authors: CmsAuthor[] }) {
 
 // ─── Chat Bubble — content slides ─────────────────────────────────────────────
 
-function ChatBubble({ slide }: { slide: CmsSlide }) {
+function ChatBubble({ slide, brand }: { slide: CmsSlide; brand: BrandDisplay }) {
   const hasContent1 = !!slide.slide_content_1
   const headline = hasContent1 ? slide.slide_headline_1 : slide.slide_headline_2
   const body = hasContent1 ? slide.slide_content_1 : slide.slide_content_2
@@ -202,7 +243,7 @@ function ChatBubble({ slide }: { slide: CmsSlide }) {
   return (
     <div
       style={{
-        background: 'rgba(30,58,95,0.4)',
+        background: hexToRgba(brand.secondary_color, 0.4),
         backdropFilter: 'blur(30px)',
         WebkitBackdropFilter: 'blur(30px)',
         borderRadius: 16,
@@ -246,7 +287,7 @@ function SourceLabel({ text }: { text: string | null }) {
 
 // ─── Content Slide Renderer ───────────────────────────────────────────────────
 
-function ContentSlideRenderer({ slide, authors }: { slide: CmsSlide; authors: CmsAuthor[] }) {
+function ContentSlideRenderer({ slide, authors, brand }: { slide: CmsSlide; authors: CmsAuthor[]; brand: BrandDisplay }) {
   const heroMedia = slide.media.find((m) => m.role === 'hero') ?? slide.media[0] ?? null
   const isVideo = heroMedia?.media_type === 'video'
   const isPortrait = isVideo && slide.portrait_video
@@ -264,7 +305,7 @@ function ContentSlideRenderer({ slide, authors }: { slide: CmsSlide; authors: Cm
         }} />
         <SourceLabel text={slide.slide_media_source} />
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'flex-start', paddingBottom: 80, paddingLeft: 16, paddingRight: 16, zIndex: 10 }}>
-          <ChatBubble slide={slide} />
+          <ChatBubble slide={slide} brand={brand} />
         </div>
         <AuthorBadge authors={authors} />
       </>
@@ -303,7 +344,7 @@ function ContentSlideRenderer({ slide, authors }: { slide: CmsSlide; authors: Cm
         </div>
       )}
       <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', alignItems: 'flex-start', paddingBottom: 80, paddingLeft: 16, paddingRight: 16, zIndex: 10 }}>
-        <ChatBubble slide={slide} />
+        <ChatBubble slide={slide} brand={brand} />
       </div>
       <AuthorBadge authors={authors} />
     </>
@@ -312,7 +353,7 @@ function ContentSlideRenderer({ slide, authors }: { slide: CmsSlide; authors: Cm
 
 // ─── Story Intro Slide ────────────────────────────────────────────────────────
 
-function StoryIntroSlide({ story }: { story: CmsStory }) {
+function StoryIntroSlide({ story, brand }: { story: CmsStory; brand: BrandDisplay }) {
   return (
     <div
       style={{
@@ -377,14 +418,14 @@ function StoryIntroSlide({ story }: { story: CmsStory }) {
       )}
 
       {/* Author byline */}
-      <AuthorByline authors={story.authors} />
+      <AuthorByline authors={story.authors} brand={brand} />
 
       {/* Partner */}
       {story.partner_name && (
         <div style={{ marginTop: 20, textAlign: 'center' }}>
           <span style={{ fontSize: 12, color: '#F0F0F0', fontFamily: '"DM Sans",sans-serif' }}>
             Read full story on{' '}
-            <span style={{ color: '#FF6343', fontWeight: 700, textDecoration: 'underline' }}>
+            <span style={{ color: brand.primary_color, fontWeight: 700, textDecoration: 'underline' }}>
               {story.partner_name}
             </span>
           </span>
@@ -703,9 +744,9 @@ function PollSlide({ poll }: { poll: CmsPoll }) {
 
 // ─── Slide Dispatcher ─────────────────────────────────────────────────────────
 
-function SlideDispatcher({ virtualSlide, story }: { virtualSlide: VirtualSlide; story: CmsStory }) {
-  if (virtualSlide.type === 'intro') return <StoryIntroSlide story={story} />
-  if (virtualSlide.type === 'content') return <ContentSlideRenderer slide={virtualSlide.slide} authors={story.authors} />
+function SlideDispatcher({ virtualSlide, story, brand }: { virtualSlide: VirtualSlide; story: CmsStory; brand: BrandDisplay }) {
+  if (virtualSlide.type === 'intro') return <StoryIntroSlide story={story} brand={brand} />
+  if (virtualSlide.type === 'content') return <ContentSlideRenderer slide={virtualSlide.slide} authors={story.authors} brand={brand} />
   if (virtualSlide.type === 'quiz') return <QuizSlide quiz={virtualSlide.quiz} />
   if (virtualSlide.type === 'poll') return <PollSlide poll={virtualSlide.poll} />
   return null
@@ -725,6 +766,10 @@ interface MobileSlidePreviewRendererProps {
 
 export function MobileSlidePreviewRenderer({ story, onTotalSlidesReady, onSlideChange }: MobileSlidePreviewRendererProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
+
+  // Resolve brand once per story — default fallbacks keep the dashboard
+  // create/response previews visually identical to before.
+  const brand = useMemo(() => getBrandDisplay(story), [story])
 
   const virtualSlides: VirtualSlide[] = [
     { type: 'intro', key: 'intro' },
@@ -816,8 +861,11 @@ export function MobileSlidePreviewRenderer({ story, onTotalSlidesReady, onSlideC
 
         {/* Slide content */}
         <div style={{ position: 'absolute', inset: 0, overflow: 'hidden' }}>
-          <SlideDispatcher key={currentVSlide.key} virtualSlide={currentVSlide} story={story} />
+          <SlideDispatcher key={currentVSlide.key} virtualSlide={currentVSlide} story={story} brand={brand} />
         </div>
+
+        {/* Publisher brand mark — display-only in embeds (no edit affordance) */}
+        <BrandMark logoUrl={brand.logo_url} />
       </div>
     </div>
   )
