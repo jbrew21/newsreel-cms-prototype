@@ -132,10 +132,29 @@ function extractReferrer(req: NextRequest): string | null {
     : referer
 }
 
-function parseDeviceType(ua: string | null): string | null {
+/**
+ * Determine the device type for an incoming analytics event.
+ *
+ * Priority order:
+ *   1. If the client explicitly declared `source: 'app'`, trust it → 'mobile'.
+ *      Native mobile apps are always mobile devices, regardless of UA string.
+ *   2. Check for tablet patterns in the User-Agent.
+ *   3. Check for mobile patterns in the User-Agent. This list includes:
+ *        - Browser UAs: iPhone, iPod, Android Mobile, Windows Phone, etc.
+ *        - Our custom app UA: NewsreelApp
+ *        - Native HTTP client defaults: okhttp (Android), CFNetwork/Darwin (iOS)
+ *   4. Fall through to 'desktop'.
+ */
+function parseDeviceType(ua: string | null, source?: string | null): string | null {
+  // Native apps always report as mobile — trust the declared source over UA heuristics.
+  if (source === 'app') return 'mobile'
   if (!ua) return null
   if (/iPad|Tablet|PlayBook|Silk(?!.*Mobile)/i.test(ua)) return 'tablet'
-  if (/Mobi|iPhone|iPod|Android.*Mobile|Windows Phone|webOS|BlackBerry|Opera Mini|IEMobile/i.test(ua)) {
+  if (
+    /NewsreelApp|Mobi|iPhone|iPod|Android.*Mobile|Windows Phone|webOS|BlackBerry|Opera Mini|IEMobile|okhttp|CFNetwork|Darwin/i.test(
+      ua
+    )
+  ) {
     return 'mobile'
   }
   return 'desktop'
@@ -235,7 +254,9 @@ export async function POST(req: NextRequest) {
   // ── Enrich from request headers (trusted server-side data) ───────────
   const domain = extractDomain(req)
   const referrer = extractReferrer(req)
-  const deviceType = parseDeviceType(req.headers.get('user-agent'))
+  // Pass the validated `source` so native app traffic is correctly classified
+  // as 'mobile' even when the User-Agent doesn't match a browser pattern.
+  const deviceType = parseDeviceType(req.headers.get('user-agent'), source)
   const country = extractCountry(req)
 
   // ── Validate & shape each event ──────────────────────────────────────

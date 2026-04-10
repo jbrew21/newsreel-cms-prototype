@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase/client'
 import { corsHeaders, resolveMediaUrl, buildSlideResponse } from '@/lib/supabase/api-helpers'
+import {
+  NEWSREEL_HOUSE_DOMAIN,
+  getAuthorBrandByDomain,
+  resolveBrandDomain,
+  resolveDisplayBrand,
+} from '@/lib/supabase/author-brand'
 
 /**
  * GET /api/stories/:id
@@ -164,6 +170,32 @@ export async function GET(
         linkedin: author.author_linked_in || null,
       }))
 
+    // ── Publisher brand resolution ───────────────────────────────────────
+    // Resolve the brand for this story's first author. Email is fetched
+    // in a separate query so it never lands in the public `authors[]`
+    // response. Both lookups run in parallel to keep latency flat.
+    const firstAuthorId: string | null = authors[0]?.id ?? null
+    let brandDomain: string | null = null
+    if (firstAuthorId) {
+      const { data: emailRow } = await supabase
+        .from('authors')
+        .select('author_email')
+        .eq('id', firstAuthorId)
+        .maybeSingle()
+      brandDomain = resolveBrandDomain(emailRow?.author_email ?? null)
+    }
+
+    const [authorBrand, houseBrand] = await Promise.all([
+      brandDomain ? getAuthorBrandByDomain(brandDomain).catch(() => null) : null,
+      getAuthorBrandByDomain(NEWSREEL_HOUSE_DOMAIN).catch(() => null),
+    ])
+    const resolvedBrand = resolveDisplayBrand(authorBrand, houseBrand)
+    const brand = {
+      logo_url: resolvedBrand.logo_url,
+      primary_color: resolvedBrand.primary_color,
+      secondary_color: resolvedBrand.secondary_color,
+    }
+
     // Build quiz
     const quiz = quizzes?.[0]
       ? {
@@ -214,6 +246,7 @@ export async function GET(
       slides: sortedSlides,
       slide_count: sortedSlides.length,
       authors,
+      brand,
       quiz,
       poll,
       audio: storyAudio

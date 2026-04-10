@@ -10,9 +10,15 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
-import { Camera, ImageIcon, Loader2, User, Eye, Target, BookOpen, Check, ArrowRight } from 'lucide-react'
+import { Camera, ImageIcon, Loader2, User, Eye, Target, BookOpen, Check, ArrowRight, Palette, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getPublicUrl } from '@/lib/supabase/storage'
+import { BrandSettingsModal } from '@/components/brand/brand-settings-modal'
+import {
+  getAuthorBrandByDomain,
+  resolveBrandDomain,
+} from '@/lib/supabase/author-brand'
+import type { AuthorBrand } from '@/lib/supabase/types'
 
 const AVATAR_BUCKET = 'author-avatars'
 const COVER_BUCKET = 'author-covers'
@@ -103,6 +109,11 @@ function OnboardingContent() {
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [passwordSubmitting, setPasswordSubmitting] = useState(false)
 
+  // Publisher brand state (edit mode only, non-generic email domains only)
+  const [authorBrand, setAuthorBrand] = useState<AuthorBrand | null>(null)
+  const [brandModalOpen, setBrandModalOpen] = useState(false)
+  const brandDomain = resolveBrandDomain(user?.email)
+
   useEffect(() => {
     checkUser()
   }, [])
@@ -163,6 +174,7 @@ function OnboardingContent() {
           // Fetch stats when in edit mode
           if (isEditMode) {
             fetchAuthorStats(authorData.id)
+            fetchAuthorBrand(user.email)
           }
         } else {
           // No author record — brand new user, start at principles
@@ -176,6 +188,18 @@ function OnboardingContent() {
       router.push('/')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchAuthorBrand = async (email: string | null | undefined) => {
+    const domain = resolveBrandDomain(email)
+    if (!domain) return
+    try {
+      const brand = await getAuthorBrandByDomain(domain)
+      setAuthorBrand(brand)
+    } catch (err) {
+      // Non-fatal: brand is optional. Leave it null and let the CTA show.
+      console.error('Error fetching author brand:', err)
     }
   }
 
@@ -881,6 +905,71 @@ function OnboardingContent() {
               </div>
             )}
 
+            {/* Publisher Brand (edit mode only, work emails only) */}
+            {isEditMode && brandDomain && (
+              <div className="pt-4 border-t border-border">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Publisher brand
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setBrandModalOpen(true)}
+                  className="w-full flex items-center gap-4 rounded-xl border border-border bg-card p-4 text-left transition-all duration-200 hover:border-primary/40 hover:bg-accent/30"
+                >
+                  {/* Logo thumbnail or placeholder */}
+                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg border border-border bg-muted overflow-hidden">
+                    {authorBrand?.logo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={authorBrand.logo_url}
+                        alt={`${brandDomain} logo`}
+                        className="max-h-full max-w-full object-contain"
+                      />
+                    ) : (
+                      <Palette className="h-5 w-5 text-muted-foreground" />
+                    )}
+                  </div>
+
+                  {/* Copy + color dots */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate flex items-center gap-1.5">
+                      {authorBrand
+                        ? `${brandDomain} brand`
+                        : 'Make it yours — add your brand'}
+                      {!authorBrand && <Sparkles className="h-3.5 w-3.5 text-primary" />}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {authorBrand
+                        ? 'Logo and colors shown on every embed from your publisher.'
+                        : 'Upload a logo and pick brand colors — shown on every story embed.'}
+                    </p>
+                  </div>
+
+                  {/* Color swatches preview */}
+                  {authorBrand && (authorBrand.primary_color || authorBrand.secondary_color) && (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {authorBrand.primary_color && (
+                        <span
+                          className="h-5 w-5 rounded-full border border-border/60"
+                          style={{ background: authorBrand.primary_color }}
+                          aria-label={`Primary ${authorBrand.primary_color}`}
+                        />
+                      )}
+                      {authorBrand.secondary_color && (
+                        <span
+                          className="h-5 w-5 rounded-full border border-border/60"
+                          style={{ background: authorBrand.secondary_color }}
+                          aria-label={`Secondary ${authorBrand.secondary_color}`}
+                        />
+                      )}
+                    </div>
+                  )}
+
+                  <ArrowRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                </button>
+              </div>
+            )}
+
             {/* Change Password (edit mode only) */}
             {isEditMode && (
               <div className="pt-4 border-t border-border">
@@ -989,6 +1078,17 @@ function OnboardingContent() {
           </div>
         </Card>
       </main>
+
+      {/* Publisher brand modal (edit mode only) */}
+      {isEditMode && brandDomain && (
+        <BrandSettingsModal
+          open={brandModalOpen}
+          onOpenChange={setBrandModalOpen}
+          authorEmail={user?.email}
+          authorId={authorId}
+          onSaved={(brand) => setAuthorBrand(brand)}
+        />
+      )}
     </div>
   )
 }
