@@ -137,6 +137,14 @@ export async function GET(
       .limit(1)
       .single()
 
+    // Fetch enrichment data for this story
+    const { data: storyEnrichment } = await supabase
+      .from('story_enrichment')
+      .select('category, subcategory, topics, tags, entities, locale_country, locale_region, locale_city, coordinates, scope, sentiment')
+      .eq('story_id', id)
+      .limit(1)
+      .single()
+
     // Resolve cover media
     const coverMedia = story.story_media?.find((sm: any) => sm.role === 'cover')
     const coverAsset = coverMedia?.media_assets || null
@@ -255,6 +263,21 @@ export async function GET(
             narration_text: storyAudio.narration_text,
             voice: storyAudio.voice,
             duration_ms: storyAudio.duration_ms,
+          }
+        : null,
+      enrichment: storyEnrichment
+        ? {
+            category: storyEnrichment.category,
+            subcategory: storyEnrichment.subcategory,
+            topics: storyEnrichment.topics,
+            tags: storyEnrichment.tags,
+            entities: storyEnrichment.entities,
+            locale_country: storyEnrichment.locale_country,
+            locale_region: storyEnrichment.locale_region,
+            locale_city: storyEnrichment.locale_city,
+            coordinates: storyEnrichment.coordinates,
+            scope: storyEnrichment.scope,
+            sentiment: storyEnrichment.sentiment,
           }
         : null,
       created_at: story.created_at,
