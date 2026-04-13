@@ -749,7 +749,19 @@ export async function updateBriefPost(params: {
       await supabase.from('slides').delete().eq('id', slideId)
     }
 
-    // 3b: Update existing slides and create new ones
+    // 3b: Clear existing slide indices to avoid unique-constraint conflicts
+    // when new slides are inserted at positions occupied by existing slides.
+    const remainingSlideIds = existingSlideIds.filter(id => !slidesToDelete.includes(id))
+    if (remainingSlideIds.length > 0) {
+      for (let k = 0; k < remainingSlideIds.length; k++) {
+        await supabase
+          .from('slides')
+          .update({ slide_index: -(k + 1) })
+          .eq('id', remainingSlideIds[k])
+      }
+    }
+
+    // 3c: Update existing slides and create new ones
     const sortedSlides = [...draftState.slides].sort(
       (a, b) => a.slideIndex - b.slideIndex
     )
