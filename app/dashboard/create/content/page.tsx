@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video, ChevronDown, Camera, Smartphone } from 'lucide-react'
+import { ArrowLeft, Plus, X, GripVertical, Check, Image as ImageIcon, Video, ChevronDown, Camera, Smartphone, AlertCircle } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { Logo } from '@/components/brand/logo'
 import { cn } from '@/lib/utils'
@@ -36,6 +36,16 @@ interface Author {
   author_email: string | null
   author_avatar: string | null
   created_at: string | null
+}
+
+const MAX_UPLOAD_BYTES = 500 * 1024 * 1024
+const MAX_UPLOAD_LABEL = '500 MB'
+
+function formatFileSize(bytes: number): string {
+  if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`
+  if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  if (bytes >= 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${bytes} B`
 }
 
 const SUBHEADLINE_PRESETS = [
@@ -106,6 +116,10 @@ export default function CreateContentPage() {
   const [mediaSearchSlideId, setMediaSearchSlideId] = useState<string | null>(null)
   const [coverPickerOpen, setCoverPickerOpen] = useState(false)
   const [coverSearchOpen, setCoverSearchOpen] = useState(false)
+
+  // Upload size validation errors
+  const [coverUploadError, setCoverUploadError] = useState<string | null>(null)
+  const [slideUploadErrors, setSlideUploadErrors] = useState<Map<string, string>>(new Map())
 
   // Video recorder state
   const [bgSelectorSlideId, setBgSelectorSlideId] = useState<string | null>(null)
@@ -407,6 +421,28 @@ export default function CreateContentPage() {
   const handleSlideMediaChange = (slideId: string, files: FileList | null) => {
     if (files && files.length > 0) {
       const fileArray = Array.from(files)
+
+      // Size validation — reject the whole selection if any file exceeds the cap
+      const oversized = fileArray.find(file => file.size > MAX_UPLOAD_BYTES)
+      if (oversized) {
+        setSlideUploadErrors(prev => {
+          const next = new Map(prev)
+          next.set(
+            slideId,
+            `"${oversized.name}" is ${formatFileSize(oversized.size)}. Maximum file size is ${MAX_UPLOAD_LABEL}.`
+          )
+          return next
+        })
+        const input = document.getElementById(`image-input-${slideId}`) as HTMLInputElement | null
+        if (input) input.value = ''
+        return
+      }
+      setSlideUploadErrors(prev => {
+        if (!prev.has(slideId)) return prev
+        const next = new Map(prev)
+        next.delete(slideId)
+        return next
+      })
 
       // Create preview URLs
       const urls = fileArray.map(file => URL.createObjectURL(file))
@@ -918,7 +954,18 @@ export default function CreateContentPage() {
                         type="file"
                         accept="image/*,video/*"
                         className="hidden"
-                        onChange={(e) => setStoryData(prev => ({ ...prev, headlinePhoto: e.target.files?.[0] || null, headlinePhotoUrl: undefined }))}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null
+                          if (file && file.size > MAX_UPLOAD_BYTES) {
+                            setCoverUploadError(
+                              `"${file.name}" is ${formatFileSize(file.size)}. Maximum file size is ${MAX_UPLOAD_LABEL}.`
+                            )
+                            e.target.value = ''
+                            return
+                          }
+                          setCoverUploadError(null)
+                          setStoryData(prev => ({ ...prev, headlinePhoto: file, headlinePhotoUrl: undefined }))
+                        }}
                       />
                       <span className="text-sm text-muted-foreground">
                         {storyHeadlineVideo
@@ -930,6 +977,26 @@ export default function CreateContentPage() {
                               : 'No file chosen'}
                       </span>
                     </div>
+                    {coverUploadError && (
+                      <div
+                        role="alert"
+                        className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                      >
+                        <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                        <div className="flex-1">
+                          <p className="font-medium">File too large</p>
+                          <p className="text-destructive/90">{coverUploadError}</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setCoverUploadError(null)}
+                          className="text-destructive/70 hover:text-destructive transition-colors"
+                          aria-label="Dismiss error"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                     {/* Headline Photo/Video Preview - new file or existing URL (but not if recording exists) */}
                     {!storyHeadlineVideo && (headlinePhotoPreview || (storyData.headlinePhotoUrl && !storyData.headlinePhoto)) && (
                       <div className="relative w-full max-w-xs">
@@ -1405,6 +1472,31 @@ export default function CreateContentPage() {
                                           : 'No file chosen'}
                                 </span>
                               </div>
+                              {slideUploadErrors.get(slide.id) && (
+                                <div
+                                  role="alert"
+                                  className="flex items-start gap-2 rounded-md border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+                                >
+                                  <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+                                  <div className="flex-1">
+                                    <p className="font-medium">File too large</p>
+                                    <p className="text-destructive/90">{slideUploadErrors.get(slide.id)}</p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSlideUploadErrors(prev => {
+                                      if (!prev.has(slide.id)) return prev
+                                      const next = new Map(prev)
+                                      next.delete(slide.id)
+                                      return next
+                                    })}
+                                    className="text-destructive/70 hover:text-destructive transition-colors"
+                                    aria-label="Dismiss error"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
+                              )}
                               {/* Existing Media Preview (edit mode or search selection) */}
                               {!slideMediaPreviews.get(slide.id) && (slide.savedMediaUrls?.length ? slide.savedMediaUrls : slide.existingMediaUrls)?.map((url, idx) => {
                                 const isVideoUrl = url.includes('/video/') || /\.(mp4|mov|webm|avi)(\?|$)/i.test(url)

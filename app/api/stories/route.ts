@@ -19,6 +19,16 @@ import { corsHeaders, resolveMediaUrl, buildStorySummary } from '@/lib/supabase/
  *   - domain (string) — filter stories visible to this email domain (e.g. "nyu.edu").
  *       Returns stories where allowed_domains is null (public) OR contains the domain.
  *
+ * Enrichment filters (comma-separated for multiple, OR within same param, AND across params):
+ *   - category (string) — e.g. "Politics" or "Politics,Business"
+ *   - subcategory (string) — e.g. "Elections" or "Elections,AI"
+ *   - tag (string) — e.g. "iran" or "iran,trump"
+ *   - topic (string) — e.g. "Iran War" or "Iran War,2026 Olympics"
+ *   - entity (string) — e.g. "Elon Musk" or "Elon Musk,OpenAI"
+ *   - scope (string) — "local", "national", or "international"
+ *   - sentiment (string) — "positive", "neutral", or "negative"
+ *   - locale_country (string) — e.g. "United States" or "India"
+ *
  * Returns: { stories: [...], pagination: { page, limit, total, total_pages } }
  */
 export async function GET(request: NextRequest) {
@@ -33,9 +43,83 @@ export async function GET(request: NextRequest) {
   const search = searchParams.get('search') || searchParams.get('q')
   const domain = searchParams.get('domain')
 
+  // Enrichment filters
+  const category = searchParams.get('category')
+  const subcategory = searchParams.get('subcategory')
+  const tag = searchParams.get('tag')
+  const topic = searchParams.get('topic')
+  const entity = searchParams.get('entity')
+  const scope = searchParams.get('scope')
+  const sentiment = searchParams.get('sentiment')
+  const localeCountry = searchParams.get('locale_country')
+
+  const hasEnrichmentFilters = category || subcategory || tag || topic || entity || scope || sentiment || localeCountry
+
   const offset = (page - 1) * limit
 
   try {
+    // If enrichment filters are present, first get matching story IDs
+    // This keeps the main stories query clean and uses enrichment indexes
+    let enrichmentStoryIds: string[] | null = null
+
+    if (hasEnrichmentFilters) {
+      let enrichQuery = supabase
+        .from('story_enrichment')
+        .select('story_id')
+
+      if (category) {
+        const values = category.split(',').map((v) => v.trim())
+        enrichQuery = enrichQuery.in('category', values)
+      }
+      if (subcategory) {
+        const values = subcategory.split(',').map((v) => v.trim())
+        enrichQuery = enrichQuery.in('subcategory', values)
+      }
+      if (scope) {
+        const values = scope.split(',').map((v) => v.trim())
+        enrichQuery = enrichQuery.in('scope', values)
+      }
+      if (sentiment) {
+        const values = sentiment.split(',').map((v) => v.trim())
+        enrichQuery = enrichQuery.in('sentiment', values)
+      }
+      if (localeCountry) {
+        const values = localeCountry.split(',').map((v) => v.trim())
+        enrichQuery = enrichQuery.in('locale_country', values)
+      }
+      if (tag) {
+        const values = tag.split(',').map((v) => v.trim())
+        const conditions = values.map((t) => `tags.cs.["${t}"]`).join(',')
+        enrichQuery = enrichQuery.or(conditions)
+      }
+      if (topic) {
+        const values = topic.split(',').map((v) => v.trim())
+        const conditions = values.map((t) => `topics.cs.["${t}"]`).join(',')
+        enrichQuery = enrichQuery.or(conditions)
+      }
+      if (entity) {
+        const values = entity.split(',').map((v) => v.trim())
+        const conditions = values.map((e) => `entities.cs.[{"name":"${e}"}]`).join(',')
+        enrichQuery = enrichQuery.or(conditions)
+      }
+
+      const { data: enrichRows, error: enrichError } = await enrichQuery
+
+      if (enrichError) {
+        return NextResponse.json({ error: enrichError.message }, { status: 500, headers: corsHeaders })
+      }
+
+      enrichmentStoryIds = (enrichRows || []).map((r) => r.story_id)
+
+      // No matching stories for these filters
+      if (enrichmentStoryIds.length === 0) {
+        return NextResponse.json({
+          stories: [],
+          pagination: { page, limit, total: 0, total_pages: 0 },
+        }, { headers: corsHeaders })
+      }
+    }
+
     // Build query
     let query = supabase
       .from('stories')
@@ -67,6 +151,11 @@ export async function GET(request: NextRequest) {
           )
         )
       `, { count: 'exact' })
+
+    // Apply enrichment filter (story IDs from enrichment query)
+    if (enrichmentStoryIds) {
+      query = query.in('id', enrichmentStoryIds)
+    }
 
     // Filters
     if (status === 'published') {
@@ -113,6 +202,35 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Fetch enrichment data for returned stories
+    const storyIds = filteredStories.map((s: any) => s.id)
+    const enrichmentMap: Record<string, any> = {}
+
+    if (storyIds.length > 0) {
+      const { data: enrichRows } = await supabase
+        .from('story_enrichment')
+        .select('story_id, category, subcategory, topics, tags, entities, locale_country, locale_region, locale_city, coordinates, scope, sentiment')
+        .in('story_id', storyIds)
+
+      if (enrichRows) {
+        for (const row of enrichRows) {
+          enrichmentMap[row.story_id] = {
+            category: row.category,
+            subcategory: row.subcategory,
+            topics: row.topics,
+            tags: row.tags,
+            entities: row.entities,
+            locale_country: row.locale_country,
+            locale_region: row.locale_region,
+            locale_city: row.locale_city,
+            coordinates: row.coordinates,
+            scope: row.scope,
+            sentiment: row.sentiment,
+          }
+        }
+      }
+    }
+
     // Build clean response
     const result = filteredStories.map((story: any) => {
       // Resolve cover URL
@@ -123,7 +241,10 @@ export async function GET(request: NextRequest) {
       const authorLink = story.authors_stories_links?.[0]
       const author = authorLink?.authors || null
 
-      return buildStorySummary(story, coverUrl, author)
+      return {
+        ...buildStorySummary(story, coverUrl, author),
+        enrichment: enrichmentMap[story.id] || null,
+      }
     })
 
     const total = count || 0

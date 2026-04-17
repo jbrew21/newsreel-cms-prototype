@@ -9,8 +9,8 @@ const breeSerif = Bree_Serif({ subsets: ["latin"], weight: ["400"], variable: "-
 const ibmPlexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500"], variable: "--font-ibm-plex-mono" })
 
 export const metadata: Metadata = {
-  title: "NewsReel CMS",
-  description: "Content Management System for News Editors",
+  title: "Newsreel Contributor",
+  description: "A place for trusted voices to find new audiences",
   icons: {
     icon: "/logo/newsreel-icon.png",
   },
