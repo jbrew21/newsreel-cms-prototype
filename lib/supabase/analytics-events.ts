@@ -204,6 +204,15 @@ interface EventRow {
   metadata: Record<string, unknown> | null
 }
 
+// Supabase / PostgREST enforces a server-side `db-max-rows` cap (1000 on
+// this project) that silently clamps any single `.limit(N)` above it. For
+// correctness we must page through the result set. `HARD_CAP` bounds total
+// Node memory per aggregator call and acts as a migration signal: when an
+// aggregator hits it, the fix is to move that metric to a SQL RPC that
+// aggregates in Postgres instead of pulling raw rows.
+const FETCH_PAGE_SIZE = 1000
+const FETCH_HARD_CAP = 50_000
+
 async function fetchEvents(
   client: SupabaseClient,
   opts: BaseFetchOptions,
@@ -211,25 +220,44 @@ async function fetchEvents(
 ): Promise<EventRow[]> {
   if (!opts.storyIds.length) return []
 
-  let query = client
-    .from('story_events')
-    .select(select)
-    .in('story_id', opts.storyIds)
-    .gte('created_at', toIso(opts.range.start))
-    .lte('created_at', toIso(opts.range.end))
-    .order('created_at', { ascending: true })
-    .limit(100_000) // generous ceiling — split ranges if you exceed this
+  const rows: EventRow[] = []
+  let from = 0
 
-  if (opts.eventTypes?.length) {
-    query = query.in('event_type', opts.eventTypes)
+  while (rows.length < FETCH_HARD_CAP) {
+    let query = client
+      .from('story_events')
+      .select(select)
+      .in('story_id', opts.storyIds)
+      .gte('created_at', toIso(opts.range.start))
+      .lte('created_at', toIso(opts.range.end))
+      .order('created_at', { ascending: true })
+      .range(from, from + FETCH_PAGE_SIZE - 1)
+
+    if (opts.eventTypes?.length) {
+      query = query.in('event_type', opts.eventTypes)
+    }
+
+    const { data, error } = await query
+    if (error) {
+      console.error('[analytics-events] fetchEvents error:', error.message)
+      return rows
+    }
+
+    const page = (data as unknown as EventRow[]) || []
+    rows.push(...page)
+
+    // Short page → end of result set.
+    if (page.length < FETCH_PAGE_SIZE) return rows
+
+    from += FETCH_PAGE_SIZE
   }
 
-  const { data, error } = await query
-  if (error) {
-    console.error('[analytics-events] fetchEvents error:', error.message)
-    return []
-  }
-  return (data as unknown as EventRow[]) || []
+  console.warn(
+    `[analytics-events] FETCH_HARD_CAP (${FETCH_HARD_CAP}) reached for storyIds=${opts.storyIds.length}` +
+      ` range=${toIso(opts.range.start)}..${toIso(opts.range.end)} — results truncated.` +
+      ` Migrate this aggregator to a SQL RPC.`
+  )
+  return rows
 }
 
 // ── Overview ─────────────────────────────────────────────────────────────────
