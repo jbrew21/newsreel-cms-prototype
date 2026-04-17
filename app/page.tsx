@@ -1,9 +1,44 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { LoginForm } from '@/components/auth/login-form'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { Logo } from '@/components/brand/logo'
 import { StaticCanvas } from '@/components/effects/static-canvas'
+import { supabase } from '@/lib/supabase/client'
 
 export default function LoginPage() {
+  const router = useRouter()
+  const [checking, setChecking] = useState(true)
+
+  // If an authenticated session already exists in browser storage, forward
+  // to /dashboard — which owns the authoritative routing to onboarding /
+  // application-status / dashboard based on author state.
+  useEffect(() => {
+    let cancelled = false
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (cancelled) return
+        if (session?.user) {
+          router.replace('/dashboard')
+        } else {
+          setChecking(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setChecking(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [router])
+
+  if (checking) {
+    return <div className="min-h-screen bg-background" />
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-background relative">
       {/* VHS Static Effect */}
