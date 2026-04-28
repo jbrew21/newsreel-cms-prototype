@@ -1390,6 +1390,16 @@ export default function CreateContentPage() {
                               placeholder="Slide content..."
                               className="bg-background min-h-[120px]"
                             />
+                            {(() => {
+                              const count = (slide.slide_content_1 || '').length
+                              const over = count > 500
+                              const warn = count > 450
+                              return (
+                                <div className={`text-xs text-right ${over ? 'text-destructive' : warn ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                                  {count} / 500{over ? ' — may overflow on mobile' : ''}
+                                </div>
+                              )
+                            })()}
                           </div>
 
                           {/* Media Source */}
