@@ -12,6 +12,7 @@ import { deleteStory } from '@/lib/supabase/brief'
 import { getPublicUrl } from '@/lib/supabase/storage'
 import { cn } from '@/lib/utils'
 import { Sidebar, MobileHeader, TabContent, TransformTab, type TabId } from '@/components/dashboard'
+import { VideoCoverThumbnail } from '@/components/dashboard/video-cover-thumbnail'
 import { AnalyticsDashboard } from '@/components/analytics'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -784,11 +785,7 @@ function DashboardContent() {
                     <div className="aspect-video bg-muted relative overflow-hidden">
                       {story.coverUrl ? (
                         story.coverMediaType === 'video' ? (
-                          <div className="relative w-full h-full bg-black">
-                            <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                              <Video className="h-8 w-8 text-white" />
-                            </div>
-                          </div>
+                          <VideoCoverThumbnail videoUrl={story.coverUrl} alt={story.story_headline || 'Story cover'} />
                         ) : (
                           <img src={story.coverUrl} alt={story.story_headline || 'Story cover'} className="w-full h-full object-cover" loading="lazy" />
                         )
@@ -1192,11 +1189,7 @@ function ContentCard({
       <div className="aspect-video bg-muted relative overflow-hidden">
         {item.type === 'story' && item.data.coverUrl ? (
           item.data.coverMediaType === 'video' ? (
-            <div className="relative w-full h-full bg-black">
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                <Video className="h-8 w-8 text-white" />
-              </div>
-            </div>
+            <VideoCoverThumbnail videoUrl={item.data.coverUrl} alt={item.data.story_headline || 'Story cover'} />
           ) : (
             <img src={item.data.coverUrl} alt={item.data.story_headline || 'Story cover'} className="w-full h-full object-cover" loading="lazy" />
           )
