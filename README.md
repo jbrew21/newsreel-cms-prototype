@@ -216,3 +216,86 @@ npm run dev
 - Add user profile management
 - Set up proper error boundaries
 - Add loading states and animations
+
+---
+
+## Enterprise architecture (for Brijesh)
+
+### Why polls deserve their own table
+
+Same poll can live on a story slide AND on a Wire. Voting in either place must update the same `poll_votes` row, so the user sees their vote reflected on both surfaces.
+
+```
+polls (id, question, created_by, created_at)
+poll_options (poll_id, position 0..4, label)
+poll_votes (poll_id, user_id, position, voted_at)  -- UNIQUE(poll_id, user_id)
+```
+
+Story.poll_id and Wire.poll_id are both nullable FKs to the same `polls` table.
+
+### Visibility-aware feed (server-side, never client)
+
+```sql
+SELECT w.* FROM wires w
+WHERE w.status = 'published'
+  AND (
+    w.visibility = 'public'
+    OR (w.visibility = 'subscribers' AND EXISTS (
+        SELECT 1 FROM subscriptions s
+        WHERE s.user_id = $viewer AND s.author_id = w.author_id))
+    OR (w.visibility = 'circle' AND EXISTS (
+        SELECT 1 FROM circles c
+        WHERE c.owner_id = w.author_id AND c.member_id = $viewer))
+  )
+ORDER BY w.published_at DESC
+LIMIT 50;
+```
+
+The client filters by group (Friends/Newsroom/All) on top of what the server sent — never the source of truth.
+
+### Frontend — feature folders
+
+```
+features/wires/
+  WiresTab.tsx
+  WireComposer.tsx
+  WireCard.tsx
+  WirePollCard.tsx
+  hooks/useWires.ts        // React Query
+  api/wires.ts             // typed client wrapper
+  schemas.ts               // Zod, source of truth for types
+  mock/wires.ts            // gated by NEXT_PUBLIC_MOCK_WIRES=1
+
+features/polls/
+  PollSlider.tsx           // shared component: story slide + wire card
+  PollResults.tsx
+  hooks/usePoll.ts
+  schemas.ts
+```
+
+### Patterns to enforce
+
+- **Zod-first.** Every API boundary validated on both sides; types generated from schemas.
+- **React Query**, not `useEffect` fetches.
+- **Optimistic vote UI**, reconcile with server response.
+- **Cursor pagination** (`?after=<wire_id>`), not offset.
+- **Idempotent vote endpoint:** `POST /polls/:id/vote { position }` — re-voting replaces, never inserts.
+- **No vote-delete.** You can change your vote; you cannot un-vote. Anti-doomscroll DNA.
+- **Realtime feed via Supabase channels** — new wires appear without refresh.
+- **Audit table** `wire_status_history` for editorial accountability.
+
+### Testing matrix
+
+| Layer | Tool | Coverage |
+|---|---|---|
+| Component | Vitest + RTL | Composer modes, send-disabled until valid, vote UI flips on cast |
+| Integration | Vitest + Supabase test client | Feed query returns correct subset for each viewer |
+| E2E | Playwright | Contributor → wire → publish; reader → see in feed; vote → results |
+
+### What doesn't exist yet (gaps to fill before merging to main)
+
+- Edit-Wire flow (clicking a Wire row in the CMS does nothing)
+- `⋯` row menu (Edit / Duplicate / Delete / Pin)
+- "Share story → poll travels with it" (when selected story has a poll, embed it in the Wire)
+- Migration files in `lib/supabase/migrations/` for the `wires` / `polls` / `poll_votes` tables
+- Real `/api/wires` route handlers (currently mock data only)
