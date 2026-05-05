@@ -12,6 +12,7 @@ import { deleteStory } from '@/lib/supabase/brief'
 import { getPublicUrl } from '@/lib/supabase/storage'
 import { cn } from '@/lib/utils'
 import { Sidebar, MobileHeader, TabContent, TransformTab, type TabId } from '@/components/dashboard'
+import { WiresTab, WireComposer } from '@/components/dashboard/wires-tab'
 import { VideoCoverThumbnail } from '@/components/dashboard/video-cover-thumbnail'
 import { AnalyticsDashboard } from '@/components/analytics'
 
@@ -72,7 +73,7 @@ function formatDate(dateString: string | null): string {
 
 // ── Page ─────────────────────────────────────────────────────────────────────
 
-const VALID_TABS: readonly TabId[] = ['drafts', 'published', 'all', 'analytics', 'transform'] as const
+const VALID_TABS: readonly TabId[] = ['drafts', 'published', 'all', 'analytics', 'transform', 'wires-drafts', 'wires-published', 'wires-scheduled', 'wires-all'] as const
 
 function parseTabParam(value: string | null): TabId | null {
   if (!value) return null
@@ -95,6 +96,7 @@ function DashboardContent() {
   const [isInternalTeam, setIsInternalTeam] = useState(false)
   // Respect ?tab= query param so per-story analytics can land back on Analytics
   const [activeTab, setActiveTab] = useState<TabId>(() => parseTabParam(searchParams?.get('tab') ?? null) ?? 'drafts')
+  const [wireComposerOpen, setWireComposerOpen] = useState(false)
   const [allStories, setAllStories] = useState<StoryWithMedia[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [allStoriesLoading, setAllStoriesLoading] = useState(false)
@@ -580,6 +582,10 @@ function DashboardContent() {
     { id: 'drafts' as TabId, label: 'Drafts', count: draftContent.length },
     { id: 'published' as TabId, label: 'Published', count: publishedContent.length },
     { id: 'all' as TabId, label: 'All', visible: isInternalTeam },
+    { id: 'wires-drafts' as TabId, label: 'Drafts', count: 2 },
+    { id: 'wires-published' as TabId, label: 'Published', count: 12 },
+    { id: 'wires-scheduled' as TabId, label: 'Scheduled', count: 3 },
+    { id: 'wires-all' as TabId, label: 'All' },
     { id: 'analytics' as TabId, label: 'Analytics', icon: <BarChart3 className="h-3.5 w-3.5" /> },
     { id: 'transform' as TabId, label: 'Transform', icon: <Wand2 className="h-3.5 w-3.5" /> },
   ]
@@ -873,6 +879,19 @@ function DashboardContent() {
           </TabContent>
 
           {/* ── Analytics Tab ──────────────────────────────────────── */}
+          <TabContent id="wires-drafts" active={activeTab === 'wires-drafts'}>
+            <WiresTab filter="drafts" onCompose={() => setWireComposerOpen(true)} />
+          </TabContent>
+          <TabContent id="wires-published" active={activeTab === 'wires-published'}>
+            <WiresTab filter="published" onCompose={() => setWireComposerOpen(true)} />
+          </TabContent>
+          <TabContent id="wires-scheduled" active={activeTab === 'wires-scheduled'}>
+            <WiresTab filter="scheduled" onCompose={() => setWireComposerOpen(true)} />
+          </TabContent>
+          <TabContent id="wires-all" active={activeTab === 'wires-all'}>
+            <WiresTab filter="all" onCompose={() => setWireComposerOpen(true)} />
+          </TabContent>
+
           <TabContent id="analytics" active={activeTab === 'analytics'}>
             {author && (
               <AnalyticsDashboard
@@ -1157,6 +1176,15 @@ function DashboardContent() {
           </Card>
         </div>
       )}
+
+      {/* Wire composer modal */}
+      <WireComposer
+        open={wireComposerOpen}
+        onClose={() => setWireComposerOpen(false)}
+        authorName={getAuthorName()}
+        authorAvatar={author?.author_avatar}
+        authorRole={author?.author_role || 'Verified contributor'}
+      />
     </div>
   )
 }

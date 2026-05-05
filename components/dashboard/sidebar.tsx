@@ -1,14 +1,14 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Plus, LogOut, Users, Pencil, FileText, BarChart3, Wand2, ChevronDown } from 'lucide-react'
+import { Plus, LogOut, Users, Pencil, FileText, BarChart3, Wand2, ChevronDown, Radio } from 'lucide-react'
 import { Logo } from '@/components/brand/logo'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { cn } from '@/lib/utils'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type TabId = 'drafts' | 'published' | 'all' | 'analytics' | 'transform'
+export type TabId = 'drafts' | 'published' | 'all' | 'analytics' | 'transform' | 'wires-drafts' | 'wires-published' | 'wires-scheduled' | 'wires-all'
 
 export interface NavItem {
   id: TabId
@@ -103,7 +103,7 @@ export function Sidebar({
           {/* Stories — top-level tab with sub-tabs */}
           {(() => {
             const isStoriesActive = activeTab === 'drafts' || activeTab === 'published' || activeTab === 'all'
-            const storySubItems = navItems.filter(item => item.id !== 'analytics' && item.id !== 'transform' && item.visible !== false)
+            const storySubItems = navItems.filter(item => (item.id === 'drafts' || item.id === 'published' || item.id === 'all') && item.visible !== false)
 
             return (
               <div>
@@ -144,6 +144,67 @@ export function Sidebar({
                           onTabChange(item.id)
                           onClose()
                         }}
+                        className={cn(
+                          'w-full flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-all duration-200',
+                          activeTab === item.id
+                            ? 'bg-accent text-accent-foreground font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                        )}
+                      >
+                        <span>{item.label}</span>
+                        {item.count !== undefined && item.count > 0 && (
+                          <span className="text-xs text-muted-foreground">{item.count}</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Wires — top-level tab with sub-tabs (mirrors Stories pattern) */}
+          {(() => {
+            const isWiresActive = activeTab === 'wires-drafts' || activeTab === 'wires-published' || activeTab === 'wires-scheduled' || activeTab === 'wires-all'
+            const wireSubItems = navItems.filter(item =>
+              item.id === 'wires-drafts' || item.id === 'wires-published' || item.id === 'wires-scheduled' || item.id === 'wires-all'
+            )
+
+            return (
+              <div>
+                <button
+                  onClick={() => {
+                    if (!isWiresActive) {
+                      onTabChange('wires-drafts')
+                      onClose()
+                    }
+                  }}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-all duration-200',
+                    isWiresActive
+                      ? 'text-foreground font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
+                  )}
+                >
+                  <span className="flex items-center gap-2">
+                    <Radio className="h-3.5 w-3.5" />
+                    Wires
+                  </span>
+                  <ChevronDown className={cn(
+                    'h-3 w-3 text-muted-foreground transition-transform duration-200',
+                    isWiresActive ? 'rotate-0' : '-rotate-90'
+                  )} />
+                </button>
+
+                <div className={cn(
+                  'overflow-hidden transition-all duration-200',
+                  isWiresActive ? 'max-h-40 opacity-100 mt-0.5' : 'max-h-0 opacity-0'
+                )}>
+                  <div className="ml-3 pl-3 border-l border-border/50 space-y-0.5">
+                    {wireSubItems.map(item => (
+                      <button
+                        key={item.id}
+                        onClick={() => { onTabChange(item.id); onClose() }}
                         className={cn(
                           'w-full flex items-center justify-between px-3 py-1.5 rounded-md text-sm transition-all duration-200',
                           activeTab === item.id
