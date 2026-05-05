@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Plus, MessageSquare, BarChart3, Image as ImageIcon, Globe, Calendar, X, MoreHorizontal, FileText, Newspaper } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,8 +95,8 @@ const MOCK_WIRES: Wire[] = [
 
 const TYPE_ICON: Record<WireType, React.ReactNode> = {
   text: <FileText className="h-3.5 w-3.5" />,
-  poll: <BarChart3 className="h-3.5 w-3.5 text-yellow-500" />,
-  'story-share': <Newspaper className="h-3.5 w-3.5 text-orange-500" />,
+  poll: <BarChart3 className="h-3.5 w-3.5 text-secondary" />,
+  'story-share': <Newspaper className="h-3.5 w-3.5 text-primary" />,
 }
 
 // ── Wires List ───────────────────────────────────────────────────────────────
@@ -115,7 +115,7 @@ export function WiresTab({ filter, onCompose }: WiresTabProps) {
         <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center">
           <MessageSquare className="h-6 w-6 text-muted-foreground" />
         </div>
-        <h2 className="text-xl font-headline">No wires yet.</h2>
+        <h2 className="text-xl font-heading">No wires yet.</h2>
         <p className="text-sm text-muted-foreground">Send a wire to your subscribers in seconds.</p>
         <Button onClick={onCompose} className="mt-2 gap-1.5">
           <Plus className="h-4 w-4" /> New Wire
@@ -137,9 +137,11 @@ export function WiresTab({ filter, onCompose }: WiresTabProps) {
 
       <div className="rounded-xl border border-border overflow-hidden divide-y divide-border/50">
         {wires.map(wire => (
-          <button
+          <div
             key={wire.id}
-            className="w-full flex items-start gap-3 p-4 hover:bg-accent/50 transition-colors text-left"
+            role="button"
+            tabIndex={0}
+            className="w-full flex items-start gap-3 p-4 hover:bg-accent/50 transition-colors text-left cursor-pointer"
           >
             <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 mt-0.5">
               {TYPE_ICON[wire.type]}
@@ -171,7 +173,7 @@ export function WiresTab({ filter, onCompose }: WiresTabProps) {
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
-          </button>
+          </div>
         ))}
       </div>
     </div>
@@ -209,6 +211,7 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="max-w-xl p-0 overflow-hidden gap-0">
+        <DialogTitle className="sr-only">New wire</DialogTitle>
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-3">
@@ -240,7 +243,7 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
               className={cn(
                 'flex-1 px-3 py-3 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1 transition-colors',
                 mode === m
-                  ? 'bg-yellow-500 text-black border-yellow-500'
+                  ? 'bg-secondary text-secondary-foreground border-secondary'
                   : 'bg-transparent text-muted-foreground border-border hover:border-muted-foreground'
               )}
             >
@@ -260,7 +263,7 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
               placeholder="What's the latest? Send a wire to your subscribers…"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              className="w-full min-h-[160px] resize-none bg-transparent border border-border rounded-xl p-3 text-base outline-none focus:border-yellow-500/50"
+              className="w-full min-h-[160px] resize-none bg-transparent border border-border rounded-xl p-3 text-base outline-none focus:border-secondary/50"
             />
           )}
           {mode === 'poll' && (
@@ -270,18 +273,18 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
                 placeholder="Where do you stand?"
                 value={pollQ}
                 onChange={(e) => setPollQ(e.target.value)}
-                className="w-full bg-transparent border border-border rounded-xl p-3 text-lg font-headline outline-none focus:border-yellow-500/50"
+                className="w-full bg-transparent border border-border rounded-xl p-3 text-lg font-heading outline-none focus:border-secondary/50"
               />
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono px-1">
                 5-point Likert · result groups: Friends, Contributors, Whole app
               </div>
               <div className="bg-muted/40 rounded-xl p-4 mt-2">
                 <div className="relative h-6">
-                  <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 bg-yellow-500" />
+                  <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-0.5 bg-secondary" />
                   {[0, 25, 50, 75, 100].map(left => (
-                    <div key={left} className="absolute top-1/2 -translate-y-1/2 w-0.5 h-3.5 bg-yellow-500/55" style={{ left: `${left}%` }} />
+                    <div key={left} className="absolute top-1/2 -translate-y-1/2 w-0.5 h-3.5 bg-secondary/55" style={{ left: `${left}%` }} />
                   ))}
-                  <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-6 bg-yellow-500 rounded" style={{ left: '50%' }} />
+                  <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-6 bg-secondary rounded" style={{ left: '50%' }} />
                 </div>
                 <div className="flex justify-between text-[10px] uppercase tracking-wider text-muted-foreground font-mono mt-2">
                   <span>Strongly disagree</span>
@@ -298,7 +301,7 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
                 placeholder="Add a note about this story…"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
-                className="w-full min-h-[80px] resize-none bg-transparent border border-border rounded-xl p-3 text-base outline-none focus:border-yellow-500/50"
+                className="w-full min-h-[80px] resize-none bg-transparent border border-border rounded-xl p-3 text-base outline-none focus:border-secondary/50"
               />
               <div className="grid grid-cols-3 gap-2.5 max-h-[280px] overflow-y-auto">
                 {MOCK_STORIES.map(s => (
@@ -307,12 +310,12 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
                     onClick={() => setSelectedStory(s.id)}
                     className={cn(
                       'border rounded-xl overflow-hidden text-left transition-colors',
-                      selectedStory === s.id ? 'border-yellow-500' : 'border-border hover:border-muted-foreground'
+                      selectedStory === s.id ? 'border-secondary' : 'border-border hover:border-muted-foreground'
                     )}
                   >
                     <img src={s.img} alt="" className="w-full aspect-square object-cover" />
                     <div className="p-2.5">
-                      <div className="text-[9px] uppercase tracking-widest text-orange-500 font-semibold mb-1 font-mono">{s.tag}</div>
+                      <div className="text-[9px] uppercase tracking-widest text-primary font-semibold mb-1 font-mono">{s.tag}</div>
                       <div className="text-xs leading-snug line-clamp-2">{s.title}</div>
                     </div>
                   </button>
@@ -350,7 +353,7 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
           <div className="flex items-center gap-2 ml-2">
             <Button variant="ghost" size="sm" onClick={onClose}>Cancel</Button>
             <Button variant="secondary" size="sm" disabled={!canSend}>Save draft</Button>
-            <Button size="sm" disabled={!canSend} className="bg-orange-500 hover:bg-orange-600 text-black">Send wire</Button>
+            <Button size="sm" disabled={!canSend} className="bg-primary hover:bg-primary/90 text-primary-foreground">Send wire</Button>
           </div>
         </div>
       </DialogContent>

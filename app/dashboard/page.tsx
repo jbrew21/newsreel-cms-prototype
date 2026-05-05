@@ -129,6 +129,26 @@ function DashboardContent() {
 
   const checkUser = async () => {
     try {
+      // Dev-only bypass: when running against placeholder Supabase URL with ?devbypass=1,
+      // skip auth and use a mock author. Removed before any prod deploy.
+      const isDevBypass = typeof window !== 'undefined'
+        && (process.env.NEXT_PUBLIC_SUPABASE_URL || '').includes('placeholder')
+        && new URLSearchParams(window.location.search).has('devbypass')
+      if (isDevBypass) {
+        setUser({ id: 'dev-user', email: 'dev@newsreel.co' })
+        setAuthor({
+          id: 'dev-author',
+          author_first_name: 'Dave', author_last_name: 'Jorgenson',
+          author_bio: null, author_email: 'dev@newsreel.co',
+          author_role: 'Verified contributor', author_organization: 'Newsreel',
+          author_avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&h=120&fit=crop',
+          author_cover: null, is_first_login: false, created_at: null,
+        } as Author)
+        setIsInternalTeam(true)
+        setLoading(false)
+        return
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         router.push('/')
