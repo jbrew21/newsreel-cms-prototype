@@ -686,11 +686,11 @@ function DashboardContent() {
                   Your desk is clear.
                 </h3>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Start creating your first story to see it here.
+                  Start creating your first brief to see it here.
                 </p>
                 <Button onClick={handleNewStory}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Start a story
+                  Start a brief
                 </Button>
               </Card>
             ) : (

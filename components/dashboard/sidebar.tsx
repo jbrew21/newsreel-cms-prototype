@@ -94,7 +94,7 @@ export function Sidebar({
             className="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-sm font-medium transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
           >
             <Plus className="h-4 w-4" />
-            New Story
+            New Brief
           </button>
         </div>
 
@@ -123,7 +123,7 @@ export function Sidebar({
                 >
                   <span className="flex items-center gap-2">
                     <FileText className="h-3.5 w-3.5" />
-                    Stories
+                    Briefs
                   </span>
                   <ChevronDown className={cn(
                     'h-3 w-3 text-muted-foreground transition-transform duration-200',
