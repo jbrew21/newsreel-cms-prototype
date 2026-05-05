@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, MessageSquare, BarChart3, Image as ImageIcon, Globe, Calendar, X, MoreHorizontal, FileText, Newspaper } from 'lucide-react'
+import { Plus, MessageSquare, BarChart3, Image as ImageIcon, Globe, Calendar, X, MoreHorizontal, FileText, Newspaper, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
-export type WireType = 'text' | 'poll' | 'story-share'
+export type WireType = 'text' | 'poll' | 'story-share' | 'link'
 export type WireVisibility = 'public' | 'subscribers' | 'circle'
 export type WireStatus = 'draft' | 'published' | 'scheduled'
 
@@ -20,6 +20,9 @@ interface Wire {
   storyTitle?: string
   storyImg?: string
   pollQuestion?: string
+  linkUrl?: string
+  linkDomain?: string
+  linkTitle?: string
   visibility: WireVisibility
   status: WireStatus
   createdAt: string
@@ -91,12 +94,26 @@ const MOCK_WIRES: Wire[] = [
     createdAt: 'just now',
     scheduledFor: 'Tomorrow, 9:00 AM',
   },
+  {
+    id: '7',
+    type: 'link',
+    body: 'Reuters has the most comprehensive timeline on this. Worth a careful read.',
+    linkUrl: 'reuters.com/world/middle-east/strait-hormuz-tensions-timeline',
+    linkDomain: 'reuters.com',
+    linkTitle: 'Hormuz tensions: a 90-day timeline of how we got here',
+    visibility: 'public',
+    status: 'published',
+    createdAt: '7h ago',
+    reads: 318,
+    replies: 5,
+  },
 ]
 
 const TYPE_ICON: Record<WireType, React.ReactNode> = {
   text: <FileText className="h-3.5 w-3.5" />,
   poll: <BarChart3 className="h-3.5 w-3.5 text-secondary" />,
   'story-share': <Newspaper className="h-3.5 w-3.5 text-primary" />,
+  link: <Link2 className="h-3.5 w-3.5 text-primary" />,
 }
 
 // ── Wires List ───────────────────────────────────────────────────────────────
@@ -152,6 +169,9 @@ export function WiresTab({ filter, onCompose }: WiresTabProps) {
                 {wire.type === 'story-share' && (
                   <><span className="font-semibold">+ {wire.storyTitle}</span> — {wire.body}</>
                 )}
+                {wire.type === 'link' && (
+                  <><span className="font-semibold">↗ {wire.linkTitle}</span> — {wire.body}</>
+                )}
                 {wire.type === 'text' && wire.body}
               </div>
               <div className="flex items-center gap-3 mt-1.5 text-xs text-muted-foreground">
@@ -201,12 +221,14 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
   const [text, setText] = useState('')
   const [pollQ, setPollQ] = useState('')
   const [selectedStory, setSelectedStory] = useState<string | null>(null)
+  const [linkUrl, setLinkUrl] = useState('')
   const [visibility, setVisibility] = useState<WireVisibility>('public')
 
   const canSend =
     (mode === 'text' && text.trim().length > 0) ||
     (mode === 'poll' && pollQ.trim().length > 0) ||
-    (mode === 'story-share' && selectedStory && text.trim().length > 0)
+    (mode === 'story-share' && selectedStory && text.trim().length > 0) ||
+    (mode === 'link' && linkUrl.trim().length > 0)
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
@@ -236,7 +258,7 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
 
         {/* Mode tabs */}
         <div className="flex gap-1.5 p-3 border-b border-border">
-          {(['text', 'poll', 'story-share'] as WireType[]).map(m => (
+          {(['text', 'poll', 'story-share', 'link'] as WireType[]).map(m => (
             <button
               key={m}
               onClick={() => setMode(m)}
@@ -250,7 +272,8 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
               {m === 'text' && <FileText className="h-4 w-4" />}
               {m === 'poll' && <BarChart3 className="h-4 w-4" />}
               {m === 'story-share' && <Newspaper className="h-4 w-4" />}
-              {m === 'text' ? 'Text' : m === 'poll' ? 'Poll' : 'Share story'}
+              {m === 'link' && <Link2 className="h-4 w-4" />}
+              {m === 'text' ? 'Text' : m === 'poll' ? 'Poll' : m === 'story-share' ? 'Share story' : 'Share link'}
             </button>
           ))}
         </div>
@@ -292,6 +315,35 @@ export function WireComposer({ open, onClose, authorName, authorAvatar, authorRo
                   <span>Strongly agree</span>
                 </div>
               </div>
+            </>
+          )}
+          {mode === 'link' && (
+            <>
+              <input
+                autoFocus
+                placeholder="Paste a URL — Reuters, NYT, anywhere"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                className="w-full bg-transparent border border-border rounded-xl p-3 text-base outline-none focus:border-secondary/50"
+              />
+              <textarea
+                placeholder="Add your take on this link…"
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                className="w-full min-h-[60px] resize-none bg-transparent border border-border rounded-xl p-3 text-base outline-none focus:border-secondary/50"
+              />
+              {linkUrl && /\w+\.\w+/.test(linkUrl) && (
+                <div className="bg-muted/40 rounded-xl overflow-hidden">
+                  <div className="h-32 bg-gradient-to-br from-muted to-muted-foreground/20 flex items-center justify-center text-[10px] uppercase tracking-widest font-mono text-muted-foreground">
+                    Preview image
+                  </div>
+                  <div className="p-3.5">
+                    <div className="text-[9px] uppercase tracking-widest font-mono text-muted-foreground mb-1.5">{linkUrl.replace(/^https?:\/\//, '').split('/')[0]}</div>
+                    <div className="font-heading text-sm leading-snug mb-1">Article title fetched from Open Graph tags</div>
+                    <div className="text-xs text-muted-foreground leading-snug">Description from <code>og:description</code> or first paragraph.</div>
+                  </div>
+                </div>
+              )}
             </>
           )}
           {mode === 'story-share' && (
